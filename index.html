@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Helppis</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel2:#1e222b;
+    --border:#2a2f3a;
+    --text:#e6e8ec;
+    --muted:#8b93a3;
+    --accent:#4f8cff;
+    --green:#2fbf71;
+    --red:#e15656;
+    --yellow:#e0a640;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:20px;
+  }
+  h1{font-size:1.4rem;margin:0 0 4px;}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:20px;}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:18px;
+  }
+  .panel h2{
+    font-size:.95rem;
+    margin:0 0 12px;
+    color:var(--accent);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+  .field label{font-size:.75rem;color:var(--muted);}
+  input,select{
+    background:var(--panel2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:.9rem;
+  }
+  input:focus,select:focus{outline:1px solid var(--accent);}
+  button{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:9px 16px;
+    border-radius:8px;
+    font-size:.85rem;
+    cursor:pointer;
+    font-weight:600;
+  }
+  button.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--text);}
+  button.danger{background:var(--red);}
+  button:hover{filter:brightness(1.1);}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+    gap:8px;
+  }
+  .cell{
+    border-radius:10px;
+    padding:8px;
+    border:1px solid var(--border);
+    background:var(--panel2);
+    min-height:64px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .cell.livre{border-color:var(--green);}
+  .cell.ocupada{border-color:var(--red);background:rgba(225,86,86,.08);}
+  .cell .num{font-weight:700;font-size:.85rem;}
+  .cell .op{font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cell .status{font-size:.65rem;color:var(--muted);}
+  .helppi-quick-actions{
+    display:flex;
+    gap:4px;
+    margin-top:6px;
+  }
+  .mini-btn{
+    flex:1;
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:6px 4px;
+    border-radius:6px;
+    font-size:.68rem;
+    font-weight:600;
+    cursor:pointer;
+    min-height:30px;
+  }
+  .mini-btn.active{
+    background:var(--yellow);
+    color:#1a1300;
+    border-color:var(--yellow);
+  }
+  .mini-btn.saida{
+    background:var(--red);
+    color:#fff;
+    border-color:var(--red);
+  }
+  .mini-btn:hover{filter:brightness(1.15);}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .empty{color:var(--muted);text-align:center;padding:20px;font-size:.85rem;}
+  .form-erro{
+    margin-top:12px;
+    background:rgba(225,86,86,.12);
+    border:1px solid var(--red);
+    color:#ff9c9c;
+    padding:10px 14px;
+    border-radius:8px;
+    font-size:.85rem;
+  }
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.6);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:16px;
+  }
+  .modal-box{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+    width:min(380px, 100%);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .modal-box h3{margin:0 0 6px;font-size:1rem;color:var(--accent);}
+  .confirm-overlay{z-index:1010;}
+  .auto-backup-box{
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+  }
+  .switch-label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.85rem;
+    cursor:pointer;
+  }
+  .switch-label input{width:16px;height:16px;cursor:pointer;}
+  .hint{color:var(--muted);font-size:.72rem;margin-top:6px;line-height:1.4;}
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);
+    border:1px solid var(--accent);
+    color:var(--text);
+    padding:12px 18px;
+    border-radius:10px;
+    font-size:.85rem;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+    z-index:2000;
+    opacity:0;
+    transition:opacity .25s ease, transform .25s ease;
+    pointer-events:none;
+    max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .badge{font-size:.7rem;padding:2px 8px;border-radius:20px;background:var(--panel2);border:1px solid var(--border);}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .stats{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:.8rem;}
+  .stat b{font-size:1.1rem;display:block;color:var(--accent);}
+  .file-input-wrap{position:relative;overflow:hidden;display:inline-block;}
+  .file-input-wrap input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+  .del-btn{background:transparent;border:none;color:var(--red);font-size:.8rem;cursor:pointer;padding:2px 6px;}
+  #backupInfo{font-size:.75rem;color:var(--muted);margin-top:8px;}
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:0;
+  }
+  .tab-btn{
+    background:transparent;
+    color:var(--muted);
+    border:none;
+    border-bottom:2px solid transparent;
+    border-radius:0;
+    padding:10px 4px;
+    font-size:.85rem;
+    font-weight:600;
+  }
+  .tab-btn.active{
+    color:var(--text);
+    border-bottom:2px solid var(--accent);
+  }
+  .tab-btn:hover{filter:none;color:var(--text);}
+  .almoco-quick-nome{font-weight:700;font-size:.85rem;}
+  .cell .almoco-quick-status{
+    font-size:.65rem;
+    color:var(--muted);
+    margin-top:2px;
+    line-height:1.3;
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip;
+  }
+</style>
+</head>
+<body>
+
+<h1>Controle de Helppis</h1>
+<div class="sub">Acompanhamento dos Helppis 01 a 50 · operador em uso · histórico por data</div>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">🗂 Helppis</button>
+  <button class="tab-btn" id="tabBtnAlmoco" onclick="mudarAba('almoco')">🍽 Horário de Almoço</button>
+</div>
+
+<div id="abaHelppis" class="aba">
+
+<!-- FORM -->
+<div class="panel">
+  <h2>Registrar uso</h2>
+  <div class="row">
+    <div class="field">
+      <label>Helppi</label>
+      <select id="fHelppi"></select>
+    </div>
+    <div class="field" style="flex:2;">
+      <label>Operador</label>
+      <input type="text" id="fOperador" placeholder="Nome do operador">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="fData">
+    </div>
+    <div class="field">
+      <label>Hora (automático)</label>
+      <input type="time" id="fHora" readonly>
+    </div>
+    <div class="field" style="flex:2;">
+      <label>Observação (opcional)</label>
+      <input type="text" id="fObs" placeholder="Ex: turno manhã">
+    </div>
+    <div class="field" style="flex:0;">
+      <button onclick="addRegistro()">Registrar</button>
+    </div>
+  </div>
+  <div id="formErro" class="form-erro" style="display:none;"></div>
+</div>
+
+<!-- STATUS GRID -->
+<div class="panel">
+  <h2>Situação dos Helppis (01–50)</h2>
+  <div class="row" style="margin-bottom:12px;">
+    <div class="field">
+      <label>Ver situação na data</label>
+      <input type="date" id="gridData">
+    </div>
+    <div class="field" style="flex:0;">
+      <button class="secondary" onclick="setGridToday()">Hoje</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="statOcupadas">0</b>ocupadas</div>
+    <div class="stat"><b id="statLivres">0</b>livres</div>
+  </div>
+  <div class="grid" id="gridHelppis"></div>
+</div>
+
+<!-- HISTORY -->
+<div class="panel">
+  <h2>Histórico de registros</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>Filtrar por data</label>
+      <input type="date" id="filtroData">
+    </div>
+    <div class="field">
+      <label>Filtrar por helppi</label>
+      <select id="filtroHelppi"><option value="">Todas</option></select>
+    </div>
+    <div class="field">
+      <label>Filtrar por operador</label>
+      <input type="text" id="filtroOperador" placeholder="Nome...">
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltro()">Limpar filtro</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Helppi</th><th>Operador</th><th>Data</th><th>Hora</th><th>Saída</th><th>Dobra</th><th>Observação</th><th></th></tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="emptyMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+</div>
+
+</div><!-- fim #abaHelppis -->
+
+<div id="abaAlmoco" class="aba" style="display:none;">
+
+<!-- LANÇAR ALMOÇO -->
+<div class="panel">
+  <h2>Lançar horário de almoço — hoje (<span id="almocoHojeLabel"></span>)</h2>
+  <div class="hint">Lista com os operadores que têm lançamento de Helppi hoje. Clique no botão para registrar o horário atual, sem precisar selecionar nada.</div>
+  <div class="stats">
+    <div class="stat"><b id="statEmAlmoco">0</b>em almoço</div>
+    <div class="stat"><b id="statTrabalhando">0</b>trabalhando</div>
+  </div>
+  <div id="listaAlmocoRapido" class="grid"></div>
+</div>
+
+<!-- HISTÓRICO DE ALMOÇO -->
+<div class="panel">
+  <h2>Histórico de almoço</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>Filtrar por data</label>
+      <input type="date" id="filtroAlmocoData">
+    </div>
+    <div class="field">
+      <label>Filtrar por colaborador</label>
+      <select id="filtroAlmocoColaborador"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroAlmoco()">Limpar filtro</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Colaborador</th><th>Data</th><th>Saída</th><th>Retorno</th><th>Duração</th><th>Observação</th><th></th></tr>
+      </thead>
+      <tbody id="tbodyAlmoco"></tbody>
+    </table>
+  </div>
+  <div id="emptyAlmocoMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+</div>
+
+</div><!-- fim #abaAlmoco -->
+
+<!-- BACKUP -->
+<div class="panel">
+  <h2>Backup local</h2>
+  <div class="row">
+    <button onclick="exportBackup()">⬇ Baixar backup (JSON)</button>
+    <div class="file-input-wrap">
+      <button class="secondary">⬆ Importar backup</button>
+      <input type="file" id="importFile" accept="application/json" multiple onchange="importBackup(event)">
+    </div>
+    <button class="danger" onclick="limparTudo()">Apagar todos os dados</button>
+  </div>
+  <div id="backupInfo"></div>
+
+  <div class="auto-backup-box">
+    <label class="switch-label">
+      <input type="checkbox" id="autoBackupToggle">
+      Ativar backup automático de hora em hora
+    </label>
+    <div class="hint">Funciona somente enquanto esta página estiver aberta no navegador. A cada hora, os dados são salvos automaticamente.</div>
+    <div class="row" style="margin-top:8px;">
+      <button class="secondary" onclick="escolherArquivoBackupAutomatico()">📁 Escolher arquivo único (substitui a cada hora)</button>
+    </div>
+    <div id="autoBackupStatus" class="hint"></div>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO -->
+<div id="editModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModal();">
+  <div class="modal-box">
+    <h3 id="editHelppiLabel">Editar lançamento</h3>
+    <div class="field">
+      <label>Helppi</label>
+      <select id="editHelppi"></select>
+    </div>
+    <div class="field">
+      <label>Operador</label>
+      <input type="text" id="editOperador">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="editData">
+    </div>
+    <div class="field">
+      <label>Hora</label>
+      <input type="time" id="editHora">
+    </div>
+    <div class="field">
+      <label>Observação</label>
+      <input type="text" id="editObs">
+    </div>
+    <div class="field">
+      <label>Hora de saída (deixe em branco se ainda está em uso)</label>
+      <input type="time" id="editHoraSaida">
+    </div>
+    <div class="field">
+      <label class="switch-label" style="cursor:pointer;">
+        <input type="checkbox" id="editDobra">
+        Marcar como dobra
+      </label>
+    </div>
+    <div id="editErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicao()">Salvar</button>
+      <button class="danger" onclick="excluirEdicao()">Excluir</button>
+      <button class="secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAÇÃO -->
+<div id="confirmModal" class="modal-overlay confirm-overlay" style="display:none;" onclick="if(event.target===this) fecharConfirmModal();">
+  <div class="modal-box">
+    <h3>Confirmar ação</h3>
+    <div id="confirmModalMsg" style="font-size:.85rem;line-height:1.5;color:var(--text);"></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="danger" id="confirmModalYes">Confirmar</button>
+      <button class="secondary" onclick="fecharConfirmModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO DE ALMOÇO -->
+<div id="editAlmocoModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalAlmoco();">
+  <div class="modal-box">
+    <h3>Editar lançamento de almoço</h3>
+    <div class="field">
+      <label>Colaborador</label>
+      <input type="text" id="editAlmocoNome">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="editAlmocoData">
+    </div>
+    <div class="field">
+      <label>Saída</label>
+      <input type="time" id="editAlmocoSaida">
+    </div>
+    <div class="field">
+      <label>Retorno (deixe em branco se ainda não voltou)</label>
+      <input type="time" id="editAlmocoRetorno">
+    </div>
+    <div class="field">
+      <label>Observação</label>
+      <input type="text" id="editAlmocoObs">
+    </div>
+    <div id="editAlmocoErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoAlmoco()">Salvar</button>
+      <button class="danger" onclick="excluirDoModalAlmoco()">Excluir</button>
+      <button class="secondary" onclick="fecharModalAlmoco()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const STORAGE_KEY = 'helppi_registros';
+const LAST_BACKUP_KEY = 'helppi_last_backup';
+const ALMOCO_KEY = 'helppi_almoco_registros';
+
+// ---- SUPABASE (sincronização em tempo real entre dispositivos) ----
+const SUPABASE_URL = 'https://tshotmnnpsqcjmqaidlu.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzaG90bW5ucHNxY2ptcWFpZGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2NDkzMTksImV4cCI6MjA5OTIyNTMxOX0.ovbE4ylar6LcQvOVNVHlgL9L83sa0_PS_dwSicli_8E';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let _registrosCache = null;
+let _almocoCache = null;
+let cloudSyncOk = true;
+
+// Envia a lista inteira (registros ou almoco) para a nuvem. Silencioso em caso
+// de sucesso; avisa uma única vez se cair offline, e uma única vez ao voltar.
+async function pushToCloud(id, value){
+  try{
+    const { error } = await sb.from('kv_store').upsert({ id, value, updated_at: new Date().toISOString() });
+    if(error) throw error;
+    if(!cloudSyncOk){
+      cloudSyncOk = true;
+      showToast('✅ Conexão com a nuvem restabelecida. Dados sincronizados.');
+    }
+  }catch(err){
+    console.error('Falha ao sincronizar com a nuvem:', err);
+    if(cloudSyncOk){
+      cloudSyncOk = false;
+      showToast('⚠ Sem conexão com a nuvem agora. Salvando só neste dispositivo até a conexão voltar.');
+    }
+  }
+}
+
+// Carrega o estado atual da nuvem ao abrir a página (substitui o cache local
+// se a nuvem já tiver dados; caso contrário, envia o que existir localmente).
+async function carregarDadosNuvem(){
+  try{
+    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco']);
+    if(error) throw error;
+    const map = {};
+    (data || []).forEach(row => { map[row.id] = row.value; });
+
+    if(map.registros !== undefined){
+      _registrosCache = map.registros || [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(_registrosCache));
+    }else{
+      await pushToCloud('registros', getRegistros());
+    }
+
+    if(map.almoco !== undefined){
+      _almocoCache = map.almoco || [];
+      localStorage.setItem(ALMOCO_KEY, JSON.stringify(_almocoCache));
+    }else{
+      await pushToCloud('almoco', getAlmocoRegistros());
+    }
+
+    renderAll();
+    renderAlmocoTudo();
+    renderFiltroAlmocoColaborador();
+    updateBackupInfo();
+    cloudSyncOk = true;
+  }catch(err){
+    console.error('Falha ao carregar dados da nuvem, usando dados locais:', err);
+    showToast('⚠ Não foi possível conectar à nuvem agora. Mostrando dados salvos neste dispositivo.');
+  }
+}
+
+// Mantém todos os dispositivos em sincronia: quando outra pessoa salva algo,
+// esta aba recebe o dado atualizado e re-renderiza automaticamente.
+function setupRealtime(){
+  sb.channel('kv_store_changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store' }, payload => {
+      const row = payload.new && payload.new.id ? payload.new : null;
+      if(!row) return;
+
+      if(row.id === 'registros'){
+        _registrosCache = row.value || [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(_registrosCache));
+        renderAll();
+        updateBackupInfo();
+      }else if(row.id === 'almoco'){
+        _almocoCache = row.value || [];
+        localStorage.setItem(ALMOCO_KEY, JSON.stringify(_almocoCache));
+        renderAlmocoTudo();
+        renderFiltroAlmocoColaborador();
+        updateBackupInfo();
+      }
+    })
+    .subscribe();
+}
+
+function todayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = (d.getMonth()+1).toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function nowTimeStr(){
+  const d = new Date();
+  return d.toTimeString().slice(0,5);
+}
+function atualizarRelogio(){
+  const fHora = document.getElementById('fHora');
+  if(fHora) fHora.value = nowTimeStr();
+}
+function pad2(n){ return n.toString().padStart(2,'0'); }
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+let toastTimeout = null;
+function showToast(msg, duracaoMs){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), duracaoMs || 5000);
+}
+
+// Confirmação própria (mais confiável que window.confirm em alguns navegadores/webviews)
+let confirmCallback = null;
+function pedirConfirmacao(msg, callback){
+  document.getElementById('confirmModalMsg').textContent = msg;
+  confirmCallback = callback;
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+function fecharConfirmModal(){
+  confirmCallback = null;
+  document.getElementById('confirmModal').style.display = 'none';
+}
+
+function getRegistros(){
+  if(_registrosCache !== null) return _registrosCache;
+  try{
+    _registrosCache = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  }catch(e){ _registrosCache = []; }
+  return _registrosCache;
+}
+function saveRegistros(list){
+  _registrosCache = list;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  pushToCloud('registros', list);
+}
+
+// ---- ALMOÇO ----
+function getAlmocoRegistros(){
+  if(_almocoCache !== null) return _almocoCache;
+  try{
+    _almocoCache = JSON.parse(localStorage.getItem(ALMOCO_KEY)) || [];
+  }catch(e){ _almocoCache = []; }
+  return _almocoCache;
+}
+function saveAlmocoRegistros(list){
+  _almocoCache = list;
+  localStorage.setItem(ALMOCO_KEY, JSON.stringify(list));
+  pushToCloud('almoco', list);
+}
+
+// ---- ABAS ----
+function mudarAba(nome){
+  const abaHelppis = document.getElementById('abaHelppis');
+  const abaAlmoco = document.getElementById('abaAlmoco');
+  const btnHelppis = document.getElementById('tabBtnHelppis');
+  const btnAlmoco = document.getElementById('tabBtnAlmoco');
+
+  if(nome === 'almoco'){
+    abaHelppis.style.display = 'none';
+    abaAlmoco.style.display = 'block';
+    btnHelppis.classList.remove('active');
+    btnAlmoco.classList.add('active');
+    renderAlmocoTudo();
+  }else{
+    abaHelppis.style.display = 'block';
+    abaAlmoco.style.display = 'none';
+    btnAlmoco.classList.remove('active');
+    btnHelppis.classList.add('active');
+  }
+}
+
+// populate helppi selects (01..50)
+function populateHelppiSelects(){
+  const fHelppi = document.getElementById('fHelppi');
+  const filtroHelppi = document.getElementById('filtroHelppi');
+  const editHelppi = document.getElementById('editHelppi');
+  for(let i=1;i<=50;i++){
+    const val = pad2(i);
+    const opt1 = document.createElement('option');
+    opt1.value = val; opt1.textContent = 'Helppi ' + val;
+    fHelppi.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = val; opt2.textContent = 'Helppi ' + val;
+    filtroHelppi.appendChild(opt2);
+
+    const opt3 = document.createElement('option');
+    opt3.value = val; opt3.textContent = 'Helppi ' + val;
+    editHelppi.appendChild(opt3);
+  }
+}
+
+function mostrarErroFormulario(msg){
+  const el = document.getElementById('formErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function esconderErroFormulario(){
+  const el = document.getElementById('formErro');
+  el.style.display = 'none';
+  el.textContent = '';
+}
+
+// Retorna o registro que efetivamente ocupa um Helppi numa data (ignora quem já
+// teve "Saída" marcada, pois esses liberam o Helppi para reuso no mesmo dia).
+function obterOcupacaoHelppi(helppi, data, excludeId){
+  const registros = getRegistros().filter(r =>
+    r.helppi === helppi && r.data === data && r.id !== excludeId
+  );
+  if(!registros.length) return null;
+
+  const ultimo = registros.reduce((a,b) => (b.hora >= a.hora ? b : a));
+  return (ultimo && !ultimo.horaSaida) ? ultimo : null;
+}
+
+function addRegistro(){
+  const helppi = document.getElementById('fHelppi').value;
+  const operador = document.getElementById('fOperador').value.trim();
+  const data = document.getElementById('fData').value || todayStr();
+  const hora = nowTimeStr(); // sempre o horário exato do momento do lançamento
+  const obs = document.getElementById('fObs').value.trim();
+
+  if(!operador){
+    mostrarErroFormulario('Informe o nome do operador.');
+    return;
+  }
+
+  const emUsoPor = obterOcupacaoHelppi(helppi, data, null);
+  if(emUsoPor){
+    mostrarErroFormulario(
+      `Helppi ${helppi} já está em uso por "${emUsoPor.operador}" em ${formatDate(data)} (${emUsoPor.hora}). ` +
+      `Escolha outro Helppi ou exclua o registro existente antes de continuar.`
+    );
+    return;
+  }
+
+  esconderErroFormulario();
+
+  const list = getRegistros();
+  list.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    helppi, operador, data, hora, obs
+  });
+  saveRegistros(list);
+
+  document.getElementById('fOperador').value = '';
+  document.getElementById('fObs').value = '';
+
+  selecionarProximoHelppiDisponivel(data, helppi);
+
+  renderAll();
+}
+
+// Após um lançamento, avança automaticamente o campo Helppi para o próximo
+// número que ainda não tem registro na data informada (sem precisar selecionar manualmente).
+function selecionarProximoHelppiDisponivel(dataRef, atual){
+  for(let i = 1; i <= 50; i++){
+    const atualNum = parseInt(atual, 10);
+    const candidato = pad2(((atualNum - 1 + i) % 50) + 1);
+    if(!obterOcupacaoHelppi(candidato, dataRef, null)){
+      document.getElementById('fHelppi').value = candidato;
+      return;
+    }
+  }
+  // se não achou nenhum livre (todos os 50 ocupados na data), mantém o valor atual
+}
+
+function selecionarHelppiNoFormulario(val){
+  document.getElementById('fHelppi').value = val;
+  esconderErroFormulario();
+  document.querySelector('.panel').scrollIntoView({behavior:'smooth', block:'start'});
+  document.getElementById('fOperador').focus();
+}
+
+function deleteRegistro(id){
+  pedirConfirmacao('Excluir este registro?', () => {
+    const list = getRegistros().filter(r => r.id !== id);
+    saveRegistros(list);
+    renderAll();
+  });
+}
+
+// ---- EDIÇÃO / EXCLUSÃO via modal (aberto pelo grid de situação) ----
+let editandoId = null;
+
+function abrirEdicao(id){
+  const reg = getRegistros().find(r => r.id === id);
+  if(!reg) return;
+
+  editandoId = id;
+  document.getElementById('editHelppiLabel').textContent = 'Editar Helppi ' + reg.helppi;
+  document.getElementById('editHelppi').value = reg.helppi;
+  document.getElementById('editOperador').value = reg.operador;
+  document.getElementById('editData').value = reg.data;
+  document.getElementById('editHora').value = reg.hora;
+  document.getElementById('editObs').value = reg.obs || '';
+  document.getElementById('editHoraSaida').value = reg.horaSaida || '';
+  document.getElementById('editDobra').checked = !!reg.dobra;
+  document.getElementById('editErro').style.display = 'none';
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function fecharModal(){
+  editandoId = null;
+  document.getElementById('editModal').style.display = 'none';
+}
+
+function mostrarErroEdicao(msg){
+  const el = document.getElementById('editErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicao(){
+  if(!editandoId) return;
+
+  const helppi = document.getElementById('editHelppi').value;
+  const operador = document.getElementById('editOperador').value.trim();
+  const data = document.getElementById('editData').value;
+  const hora = document.getElementById('editHora').value;
+  const obs = document.getElementById('editObs').value.trim();
+  const horaSaida = document.getElementById('editHoraSaida').value || '';
+  const dobra = document.getElementById('editDobra').checked;
+
+  if(!operador){
+    mostrarErroEdicao('Informe o nome do operador.');
+    return;
+  }
+  if(!data || !hora){
+    mostrarErroEdicao('Informe data e hora.');
+    return;
+  }
+  if(horaSaida && horaSaida < hora){
+    mostrarErroEdicao('A hora de saída não pode ser antes da hora de entrada.');
+    return;
+  }
+
+  const list = getRegistros();
+  const idx = list.findIndex(r => r.id === editandoId);
+  if(idx === -1) return;
+
+  // se ainda está em uso (sem hora de saída), verifica conflito com outro
+  // lançamento ativo no mesmo Helppi/data
+  if(!horaSaida){
+    const conflito = obterOcupacaoHelppi(helppi, data, editandoId);
+    if(conflito){
+      mostrarErroEdicao(`Helppi ${helppi} já está em uso por "${conflito.operador}" em ${formatDate(data)} (${conflito.hora}).`);
+      return;
+    }
+  }
+
+  list[idx] = { ...list[idx], helppi, operador, data, hora, obs, horaSaida, dobra };
+  saveRegistros(list);
+  fecharModal();
+  renderAll();
+}
+
+function excluirEdicao(){
+  if(!editandoId) return;
+  const idParaExcluir = editandoId;
+
+  pedirConfirmacao('Excluir este lançamento?', () => {
+    const list = getRegistros().filter(r => r.id !== idParaExcluir);
+    saveRegistros(list);
+    fecharModal();
+    renderAll();
+  });
+}
+
+function limparFiltro(){
+  document.getElementById('filtroData').value = '';
+  document.getElementById('filtroHelppi').value = '';
+  document.getElementById('filtroOperador').value = '';
+  renderTable();
+}
+
+function setGridToday(){
+  document.getElementById('gridData').value = todayStr();
+  renderGrid();
+}
+
+function renderGrid(){
+  const dataFiltro = document.getElementById('gridData').value || todayStr();
+  const list = getRegistros().filter(r => r.data === dataFiltro);
+
+  // latest registro per helppi for that date (by hora)
+  const latestPerHelppi = {};
+  list.forEach(r => {
+    const cur = latestPerHelppi[r.helppi];
+    if(!cur || r.hora >= cur.hora){
+      latestPerHelppi[r.helppi] = r;
+    }
+  });
+
+  const gridEl = document.getElementById('gridHelppis');
+  gridEl.innerHTML = '';
+  let ocupadas = 0;
+
+  for(let i=1;i<=50;i++){
+    const val = pad2(i);
+    const regBruto = latestPerHelppi[val];
+    // se o último lançamento já teve "Saída" marcada, o Helppi volta a ficar livre
+    const reg = (regBruto && !regBruto.horaSaida) ? regBruto : null;
+
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (reg ? 'ocupada' : 'livre');
+
+    if(reg){
+      ocupadas++;
+      cell.style.cursor = 'pointer';
+      cell.title = 'Clique para editar ou excluir este lançamento';
+      cell.onclick = () => abrirEdicao(reg.id);
+    }else{
+      cell.style.cursor = 'pointer';
+      cell.title = 'Clique para preencher este Helppi no formulário de registro';
+      cell.onclick = () => selecionarHelppiNoFormulario(val);
+    }
+
+    cell.innerHTML = `
+      <div class="num">Helppi ${val}</div>
+      <div class="op">${reg ? escapeHtml(reg.operador) : '—'}</div>
+      <div class="status">${reg ? reg.hora + (reg.dobra ? ' · 🔁 dobra' : '') + ' · editar' : 'Livre'}</div>
+    `;
+
+    if(reg && dataFiltro === todayStr()){
+      cell.appendChild(criarBotoesAcaoHelppi(reg));
+    }
+
+    gridEl.appendChild(cell);
+  }
+
+  document.getElementById('statOcupadas').textContent = ocupadas;
+  document.getElementById('statLivres').textContent = 50 - ocupadas;
+}
+
+// Cria os botões de ação rápida "Dobra" e "Saída" dentro da célula ocupada.
+function criarBotoesAcaoHelppi(reg){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'helppi-quick-actions';
+
+  const btnDobra = document.createElement('button');
+  btnDobra.className = 'mini-btn' + (reg.dobra ? ' active' : '');
+  btnDobra.textContent = reg.dobra ? '🔁 Dobra' : 'Dobra';
+  btnDobra.title = 'Marcar/desmarcar que este operador está fazendo dobra neste Helppi';
+  btnDobra.onclick = (e) => {
+    e.stopPropagation();
+    marcarDobraHelppi(reg.id);
+  };
+
+  const btnSaida = document.createElement('button');
+  btnSaida.className = 'mini-btn saida';
+  btnSaida.textContent = 'Saída';
+  btnSaida.title = 'Registrar a saída do operador e liberar este Helppi';
+  btnSaida.onclick = (e) => {
+    e.stopPropagation();
+    marcarSaidaHelppi(reg.id);
+  };
+
+  wrapper.appendChild(btnDobra);
+  wrapper.appendChild(btnSaida);
+  return wrapper;
+}
+
+function marcarDobraHelppi(id){
+  const list = getRegistros();
+  const idx = list.findIndex(r => r.id === id);
+  if(idx === -1) return;
+
+  list[idx].dobra = !list[idx].dobra;
+  saveRegistros(list);
+  renderAll();
+  showToast(list[idx].dobra
+    ? `Dobra marcada: ${list[idx].operador} · Helppi ${list[idx].helppi}.`
+    : `Marcação de dobra removida: ${list[idx].operador} · Helppi ${list[idx].helppi}.`);
+}
+
+function marcarSaidaHelppi(id){
+  const list = getRegistros();
+  const idx = list.findIndex(r => r.id === id);
+  if(idx === -1) return;
+
+  const hora = nowTimeStr();
+  list[idx].horaSaida = hora;
+  saveRegistros(list);
+  renderAll();
+  showToast(`Saída registrada às ${hora}. Helppi ${list[idx].helppi} está livre novamente.`);
+}
+
+function renderTable(){
+  const dataFiltro = document.getElementById('filtroData').value;
+  const helppiFiltro = document.getElementById('filtroHelppi').value;
+  const opFiltro = document.getElementById('filtroOperador').value.trim().toLowerCase();
+
+  let list = getRegistros();
+
+  if(dataFiltro) list = list.filter(r => r.data === dataFiltro);
+  if(helppiFiltro) list = list.filter(r => r.helppi === helppiFiltro);
+  if(opFiltro) list = list.filter(r => r.operador.toLowerCase().includes(opFiltro));
+
+  list.sort((a,b) => (b.data+b.hora).localeCompare(a.data+a.hora));
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+
+  document.getElementById('emptyMsg').style.display = list.length ? 'none' : 'block';
+
+  list.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge">Helppi ${r.helppi}</span></td>
+      <td>${escapeHtml(r.operador)}</td>
+      <td>${formatDate(r.data)}</td>
+      <td>${r.hora}</td>
+      <td>${r.horaSaida || '—'}</td>
+      <td>${r.dobra ? '🔁 Sim' : '—'}</td>
+      <td>${escapeHtml(r.obs) || '—'}</td>
+      <td>
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicao('${r.id}')">Editar</button>
+        <button class="del-btn" onclick="deleteRegistro('${r.id}')">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function formatDate(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function renderAll(){
+  renderGrid();
+  renderTable();
+  updateBackupInfo();
+}
+
+function renderAlmocoTudo(){
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+}
+
+// Preenche o filtro "Filtrar por colaborador" do histórico com os nomes que
+// já têm algum lançamento de almoço (não depende de cadastro manual).
+function renderFiltroAlmocoColaborador(){
+  const selectFiltro = document.getElementById('filtroAlmocoColaborador');
+  const valorSelecionado = selectFiltro.value;
+
+  const nomes = [...new Set(getAlmocoRegistros().map(r => r.colaboradorNome))]
+    .sort((a,b) => a.localeCompare(b, 'pt-BR'));
+
+  selectFiltro.innerHTML = '<option value="">Todos</option>';
+  nomes.forEach(nome => {
+    const opt = document.createElement('option');
+    opt.value = nome; opt.textContent = nome;
+    selectFiltro.appendChild(opt);
+  });
+
+  if(nomes.includes(valorSelecionado)) selectFiltro.value = valorSelecionado;
+}
+
+// ---- LANÇAMENTO RÁPIDO DE ALMOÇO (um clique, sem seleção) ----
+
+// Retorna o status do almoço de hoje para um colaborador:
+// 'nenhum' (ainda não saiu), 'aberto' (saiu, aguardando retorno) ou 'completo' (saiu e voltou)
+function statusAlmocoHoje(nome){
+  const hoje = todayStr();
+  const registros = getAlmocoRegistros()
+    .filter(r => r.data === hoje && r.colaboradorNome === nome)
+    .sort((a,b) => (a.saida || '').localeCompare(b.saida || ''));
+
+  const aberto = registros.find(r => r.saida && !r.retorno);
+
+  return { tipo: aberto ? 'aberto' : (registros.length ? 'completo' : 'nenhum'), aberto, todos: registros };
+}
+
+// Retorna, em ordem alfabética, os nomes distintos de operadores que têm
+// lançamento de Helppi na data de hoje (só quem está trabalhando hoje).
+function obterOperadoresDeHoje(){
+  const hoje = todayStr();
+  const nomes = [...new Set(
+    getRegistros()
+      .filter(r => r.data === hoje)
+      .map(r => (r.operador || '').trim())
+      .filter(Boolean)
+  )];
+  return nomes.sort((a,b) => a.localeCompare(b, 'pt-BR'));
+}
+
+function renderListaAlmocoRapido(){
+  document.getElementById('almocoHojeLabel').textContent = formatDate(todayStr());
+
+  const operadoresHoje = obterOperadoresDeHoje();
+  const container = document.getElementById('listaAlmocoRapido');
+  container.innerHTML = '';
+
+  if(!operadoresHoje.length){
+    container.innerHTML = '<div class="hint">Nenhum operador lançado hoje na aba Helppis ainda.</div>';
+    document.getElementById('statEmAlmoco').textContent = 0;
+    document.getElementById('statTrabalhando').textContent = 0;
+    return;
+  }
+
+  let emAlmoco = 0;
+
+  operadoresHoje.forEach(nome => {
+    const status = statusAlmocoHoje(nome);
+
+    let statusTexto, botaoTexto, acao, emAndamento;
+
+    if(!status.todos.length){
+      statusTexto = 'Ainda não saiu para o almoço';
+      botaoTexto = 'Registrar saída';
+      emAndamento = false;
+      acao = () => registrarSaidaRapida(nome);
+    }else{
+      // monta o status com TODOS os intervalos do dia, numerando quando houver
+      // mais de um, para nunca "perder" o primeiro intervalo quando um segundo
+      // for iniciado.
+      const partes = status.todos.map((r, idx) => {
+        const rotulo = status.todos.length > 1 ? `Intervalo ${idx+1}: ` : '';
+        return r.retorno
+          ? `${rotulo}${r.saida} – ${r.retorno}`
+          : `${rotulo}${r.saida} (em andamento)`;
+      });
+      statusTexto = partes.join(' · ');
+
+      if(status.tipo === 'aberto'){
+        botaoTexto = 'Registrar retorno';
+        emAndamento = true;
+        acao = () => registrarRetornoRapido(status.aberto.id);
+      }else{
+        botaoTexto = 'Novo intervalo';
+        emAndamento = false;
+        acao = () => registrarSaidaRapida(nome);
+      }
+    }
+
+    if(emAndamento) emAlmoco++;
+
+    // mesma linguagem visual da tela de Helppis: verde = disponível/trabalhando,
+    // vermelho = em almoço agora
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (emAndamento ? 'ocupada' : 'livre');
+    cell.innerHTML = `
+      <div class="num almoco-quick-nome">${escapeHtml(nome)}</div>
+      <div class="op almoco-quick-status">${statusTexto}</div>
+    `;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'helppi-quick-actions';
+    const btn = document.createElement('button');
+    btn.className = 'mini-btn' + (emAndamento ? ' saida' : '');
+    btn.textContent = botaoTexto;
+    btn.onclick = acao;
+    wrapper.appendChild(btn);
+    cell.appendChild(wrapper);
+
+    container.appendChild(cell);
+  });
+
+  document.getElementById('statEmAlmoco').textContent = emAlmoco;
+  document.getElementById('statTrabalhando').textContent = operadoresHoje.length - emAlmoco;
+}
+
+function registrarSaidaRapida(nome){
+  const lista = getAlmocoRegistros();
+  const hora = nowTimeStr();
+  lista.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    colaboradorNome: nome,
+    data: todayStr(),
+    saida: hora,
+    retorno: '',
+    obs: ''
+  });
+  saveAlmocoRegistros(lista);
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+  showToast(`Saída para almoço registrada: ${nome} às ${hora}.`);
+}
+
+function registrarRetornoRapido(id){
+  const lista = getAlmocoRegistros();
+  const idx = lista.findIndex(r => r.id === id);
+  if(idx === -1) return;
+
+  const hora = nowTimeStr();
+  lista[idx].retorno = hora;
+  saveAlmocoRegistros(lista);
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+  showToast(`Retorno do almoço registrado: ${lista[idx].colaboradorNome} às ${hora}.`);
+}
+
+function excluirAlmoco(id){
+  pedirConfirmacao('Excluir este lançamento de almoço?', () => {
+    const lista = getAlmocoRegistros().filter(r => r.id !== id);
+    saveAlmocoRegistros(lista);
+    renderListaAlmocoRapido();
+    renderFiltroAlmocoColaborador();
+    renderTabelaAlmoco();
+  });
+}
+
+// ---- EDIÇÃO DE LANÇAMENTO DE ALMOÇO ----
+let editandoAlmocoId = null;
+
+function abrirEdicaoAlmoco(id){
+  const reg = getAlmocoRegistros().find(r => r.id === id);
+  if(!reg) return;
+
+  editandoAlmocoId = id;
+  document.getElementById('editAlmocoNome').value = reg.colaboradorNome;
+  document.getElementById('editAlmocoData').value = reg.data;
+  document.getElementById('editAlmocoSaida').value = reg.saida || '';
+  document.getElementById('editAlmocoRetorno').value = reg.retorno || '';
+  document.getElementById('editAlmocoObs').value = reg.obs || '';
+  document.getElementById('editAlmocoErro').style.display = 'none';
+  document.getElementById('editAlmocoModal').style.display = 'flex';
+}
+
+function fecharModalAlmoco(){
+  editandoAlmocoId = null;
+  document.getElementById('editAlmocoModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoAlmoco(msg){
+  const el = document.getElementById('editAlmocoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoAlmoco(){
+  if(!editandoAlmocoId) return;
+
+  const colaboradorNome = document.getElementById('editAlmocoNome').value.trim();
+  const data = document.getElementById('editAlmocoData').value;
+  const saida = document.getElementById('editAlmocoSaida').value;
+  const retorno = document.getElementById('editAlmocoRetorno').value;
+  const obs = document.getElementById('editAlmocoObs').value.trim();
+
+  if(!colaboradorNome){
+    mostrarErroEdicaoAlmoco('Informe o nome do colaborador.');
+    return;
+  }
+  if(!data || !saida){
+    mostrarErroEdicaoAlmoco('Informe data e horário de saída.');
+    return;
+  }
+  if(retorno && retorno < saida){
+    mostrarErroEdicaoAlmoco('O horário de retorno não pode ser antes da saída.');
+    return;
+  }
+
+  const lista = getAlmocoRegistros();
+  const idx = lista.findIndex(r => r.id === editandoAlmocoId);
+  if(idx === -1) return;
+
+  lista[idx] = { ...lista[idx], colaboradorNome, data, saida, retorno, obs };
+  saveAlmocoRegistros(lista);
+  fecharModalAlmoco();
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+}
+
+function excluirDoModalAlmoco(){
+  if(!editandoAlmocoId) return;
+  const idParaExcluir = editandoAlmocoId;
+
+  pedirConfirmacao('Excluir este lançamento de almoço?', () => {
+    const lista = getAlmocoRegistros().filter(r => r.id !== idParaExcluir);
+    saveAlmocoRegistros(lista);
+    fecharModalAlmoco();
+    renderListaAlmocoRapido();
+    renderFiltroAlmocoColaborador();
+    renderTabelaAlmoco();
+  });
+}
+
+function calcularDuracao(saida, retorno){
+  if(!saida || !retorno) return '—';
+  const [h1,m1] = saida.split(':').map(Number);
+  const [h2,m2] = retorno.split(':').map(Number);
+  let minutos = (h2*60+m2) - (h1*60+m1);
+  if(minutos < 0) minutos += 24*60; // cobre o caso raro de intervalo virando a meia-noite
+  const h = Math.floor(minutos/60);
+  const m = minutos % 60;
+  return h > 0 ? `${h}h ${m.toString().padStart(2,'0')}min` : `${m}min`;
+}
+
+function limparFiltroAlmoco(){
+  document.getElementById('filtroAlmocoData').value = '';
+  document.getElementById('filtroAlmocoColaborador').value = '';
+  renderTabelaAlmoco();
+}
+
+function renderTabelaAlmoco(){
+  const dataFiltro = document.getElementById('filtroAlmocoData').value;
+  const colaboradorFiltro = document.getElementById('filtroAlmocoColaborador').value;
+
+  let lista = getAlmocoRegistros();
+  if(dataFiltro) lista = lista.filter(r => r.data === dataFiltro);
+  if(colaboradorFiltro) lista = lista.filter(r => r.colaboradorNome === colaboradorFiltro);
+
+  lista.sort((a,b) => (b.data+(b.saida||'')).localeCompare(a.data+(a.saida||'')));
+
+  const tbody = document.getElementById('tbodyAlmoco');
+  tbody.innerHTML = '';
+  document.getElementById('emptyAlmocoMsg').style.display = lista.length ? 'none' : 'block';
+
+  lista.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.colaboradorNome)}</td>
+      <td>${formatDate(r.data)}</td>
+      <td>${r.saida || '—'}</td>
+      <td>${r.retorno || '—'}</td>
+      <td>${calcularDuracao(r.saida, r.retorno)}</td>
+      <td>${escapeHtml(r.obs) || '—'}</td>
+      <td>
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicaoAlmoco('${r.id}')">Editar</button>
+        <button class="del-btn" onclick="excluirAlmoco('${r.id}')">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- BACKUP ----
+function exportBackup(automatico){
+  const data = {
+    exportadoEm: new Date().toISOString(),
+    registros: getRegistros(),
+    almocoRegistros: getAlmocoRegistros()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = todayStr();
+  a.href = url;
+  // nome fixo por dia nos backups automáticos, para que o navegador tente
+  // "substituir" a cópia da hora anterior em vez de acumular um arquivo por hora
+  a.download = automatico
+    ? `helppi-backup-auto-${stamp}.json`
+    : `helppi-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+  updateBackupInfo();
+}
+
+// ---- BACKUP AUTOMÁTICO DE HORA EM HORA ----
+const AUTO_BACKUP_KEY = 'helppi_auto_backup_enabled';
+const AUTO_BACKUP_LAST_HOUR_KEY = 'helppi_auto_backup_last_hour'; // guarda "YYYY-MM-DD-HH" do último backup feito
+
+// Handle do arquivo escolhido pelo usuário para sobrescrever a cada hora
+// (só existe durante esta sessão da página; funciona em Chrome/Edge no computador).
+let autoBackupFileHandle = null;
+
+function autoBackupAtivo(){
+  return localStorage.getItem(AUTO_BACKUP_KEY) === 'true';
+}
+
+function alternarAutoBackup(){
+  const checkbox = document.getElementById('autoBackupToggle');
+  const ativado = checkbox.checked;
+  localStorage.setItem(AUTO_BACKUP_KEY, ativado ? 'true' : 'false');
+  atualizarStatusAutoBackup();
+
+  if(ativado){
+    // faz um backup imediato ao ativar, em vez de esperar até o próximo bloco de hora
+    verificarBackupAutomatico(true);
+  }
+}
+
+function suportaEscolherArquivo(){
+  return typeof window.showSaveFilePicker === 'function';
+}
+
+// Deixa o usuário escolher (uma vez) o arquivo que será sobrescrito a cada
+// hora, em vez de baixar um arquivo novo toda hora.
+async function escolherArquivoBackupAutomatico(){
+  if(!suportaEscolherArquivo()){
+    showToast(
+      'Este navegador não permite sobrescrever o mesmo arquivo automaticamente (funciona no Chrome/Edge, em computador). ' +
+      'O backup automático vai continuar baixando um arquivo por hora com o mesmo nome.',
+      9000
+    );
+    return;
+  }
+  try{
+    autoBackupFileHandle = await window.showSaveFilePicker({
+      suggestedName: `helppi-backup-${todayStr()}.json`,
+      types: [{ description: 'Backup Helppi (JSON)', accept: {'application/json': ['.json']} }]
+    });
+    atualizarStatusAutoBackup();
+    showToast('Arquivo selecionado. A partir de agora ele será sobrescrito a cada hora.');
+    if(autoBackupAtivo()) verificarBackupAutomatico(true);
+  }catch(err){
+    // usuário cancelou o seletor de arquivo — não faz nada
+  }
+}
+
+// Sobrescreve de fato o arquivo escolhido com os dados atuais.
+async function escreverBackupNoArquivoEscolhido(){
+  if(!autoBackupFileHandle) return false;
+  try{
+    const permissao = await autoBackupFileHandle.requestPermission({ mode: 'readwrite' });
+    if(permissao !== 'granted') return false;
+
+    const dados = {
+      exportadoEm: new Date().toISOString(),
+      registros: getRegistros(),
+      almocoRegistros: getAlmocoRegistros()
+    };
+    const writable = await autoBackupFileHandle.createWritable();
+    await writable.write(JSON.stringify(dados, null, 2));
+    await writable.close();
+    return true;
+  }catch(err){
+    console.error('Falha ao sobrescrever o arquivo de backup automático:', err);
+    return false;
+  }
+}
+
+function atualizarStatusAutoBackup(){
+  const statusEl = document.getElementById('autoBackupStatus');
+  const partes = [];
+
+  partes.push(autoBackupAtivo() ? 'Backup automático de hora em hora ativado.' : 'Backup automático desativado.');
+
+  if(autoBackupAtivo()){
+    const ultimaHora = localStorage.getItem(AUTO_BACKUP_LAST_HOUR_KEY);
+    partes.push(ultimaHora
+      ? `Último backup automático: ${ultimaHora.slice(0,10).split('-').reverse().join('/')} às ${ultimaHora.slice(11,13)}h.`
+      : 'Ainda não foi feito nenhum backup automático.');
+
+    partes.push(autoBackupFileHandle
+      ? 'Modo: sobrescrevendo sempre o mesmo arquivo escolhido.'
+      : (suportaEscolherArquivo()
+          ? 'Modo: baixando um arquivo por hora (escolha um arquivo abaixo para sobrescrever o mesmo em vez disso).'
+          : 'Modo: baixando um arquivo por hora com o mesmo nome (navegador sem suporte a sobrescrever automaticamente).'));
+  }
+
+  statusEl.textContent = partes.join(' ');
+}
+
+// checa a cada 30s se entramos numa nova hora cheia (com margem de alguns
+// minutos, caso a aba fique em segundo plano e o intervalo atrase um pouco)
+async function verificarBackupAutomatico(forcar){
+  if(!autoBackupAtivo()) return;
+
+  const agora = new Date();
+  const minutos = agora.getMinutes();
+  if(!forcar && minutos > 4) return; // só dispara nos primeiros minutos de cada hora
+
+  const chaveHora = `${todayStr()}-${pad2(agora.getHours())}`;
+  if(!forcar && localStorage.getItem(AUTO_BACKUP_LAST_HOUR_KEY) === chaveHora) return; // já fez essa hora
+
+  let sucesso = false;
+  let usouArquivoEscolhido = false;
+
+  if(autoBackupFileHandle){
+    sucesso = await escreverBackupNoArquivoEscolhido();
+    if(sucesso){
+      usouArquivoEscolhido = true;
+      localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+      updateBackupInfo();
+    }else{
+      // o handle pode ter perdido a permissão (ex: navegador revogou); descarta
+      // para não ficar tentando escrever num arquivo inacessível toda hora
+      autoBackupFileHandle = null;
+    }
+  }
+
+  if(!sucesso){
+    // sem arquivo escolhido (ou falhou): baixa um arquivo com o mesmo nome do
+    // dia inteiro, para no mínimo tentar "substituir" a cópia anterior
+    exportBackup(true);
+    sucesso = true;
+  }
+
+  localStorage.setItem(AUTO_BACKUP_LAST_HOUR_KEY, chaveHora);
+  atualizarStatusAutoBackup();
+  showToast(usouArquivoEscolhido
+    ? `📦 Backup automático das ${pad2(agora.getHours())}h salvo no arquivo escolhido.`
+    : `📦 Backup automático das ${pad2(agora.getHours())}h baixado. Confira os downloads.`);
+}
+
+function lerArquivoComoTexto(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Falha ao ler ' + file.name));
+    reader.readAsText(file);
+  });
+}
+
+async function importBackup(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+
+  let registrosCombinados = [];
+  let almocoCombinados = [];
+  const idsVistos = new Set();
+  const almocoIdsVistos = new Set();
+  const arquivosComErro = [];
+
+  for(const file of files){
+    try{
+      const texto = await lerArquivoComoTexto(file);
+      const parsed = JSON.parse(texto);
+      const registros = Array.isArray(parsed) ? parsed : (parsed.registros || []);
+      const almocoRegistros = Array.isArray(parsed) ? [] : (parsed.almocoRegistros || []);
+
+      if(!Array.isArray(registros)) throw new Error('formato inválido');
+
+      registros.forEach(r => {
+        if(!idsVistos.has(r.id)){
+          idsVistos.add(r.id);
+          registrosCombinados.push(r);
+        }
+      });
+      almocoRegistros.forEach(r => {
+        if(!almocoIdsVistos.has(r.id)){
+          almocoIdsVistos.add(r.id);
+          almocoCombinados.push(r);
+        }
+      });
+    }catch(err){
+      arquivosComErro.push(file.name);
+    }
+  }
+
+  const totalItens = registrosCombinados.length + almocoCombinados.length;
+
+  if(!totalItens){
+    showToast('Nenhum dado válido encontrado nos arquivo(s) selecionado(s).');
+    event.target.value = '';
+    return;
+  }
+
+  pedirConfirmacao(
+    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi e ${almocoCombinados.length} lançamento(s) de almoço, de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
+    'Confirmar = Mesclar com os dados atuais. Para SUBSTITUIR tudo em vez de mesclar, clique em Cancelar e use "Apagar todos os dados" antes de importar.',
+    () => {
+      const registrosAtuais = getRegistros();
+      const idsAtuais = new Set(registrosAtuais.map(r => r.id));
+      const novosRegistros = registrosCombinados.filter(r => !idsAtuais.has(r.id));
+      saveRegistros(registrosAtuais.concat(novosRegistros));
+
+      const almocoAtuais = getAlmocoRegistros();
+      const idsAlmocoAtuais = new Set(almocoAtuais.map(r => r.id));
+      const novosAlmoco = almocoCombinados.filter(r => !idsAlmocoAtuais.has(r.id));
+      saveAlmocoRegistros(almocoAtuais.concat(novosAlmoco));
+
+      renderAll();
+      renderAlmocoTudo();
+
+      let msg = `Importação concluída: ${totalItens} item(ns) processado(s).`;
+      if(arquivosComErro.length){
+        msg += ` Não foi possível ler ${arquivosComErro.length} arquivo(s): ${arquivosComErro.join(', ')}.`;
+      }
+      showToast(msg);
+    }
+  );
+
+  event.target.value = '';
+}
+
+function limparTudo(){
+  pedirConfirmacao(
+    'Isso vai apagar TODOS os dados salvos neste dispositivo (Helppis e almoço). Essa ação não pode ser desfeita. Deseja continuar?',
+    () => {
+      saveRegistros([]);
+      saveAlmocoRegistros([]);
+      renderAll();
+      renderAlmocoTudo();
+      showToast('Todos os dados foram apagados.');
+    }
+  );
+}
+
+function updateBackupInfo(){
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  const total = getRegistros().length;
+  const totalAlmoco = getAlmocoRegistros().length;
+  const infoEl = document.getElementById('backupInfo');
+  const lastStr = last ? new Date(last).toLocaleString('pt-BR') : 'nenhum backup gerado ainda';
+  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Último backup: ${lastStr}`;
+}
+
+// ---- INIT ----
+function init(){
+  populateHelppiSelects();
+  document.getElementById('fData').value = todayStr();
+  atualizarRelogio();
+  setInterval(atualizarRelogio, 1000);
+  document.getElementById('gridData').value = todayStr();
+
+  document.getElementById('gridData').addEventListener('change', renderGrid);
+  document.getElementById('filtroData').addEventListener('change', renderTable);
+  document.getElementById('filtroHelppi').addEventListener('change', renderTable);
+  document.getElementById('filtroOperador').addEventListener('input', renderTable);
+  document.getElementById('fHelppi').addEventListener('change', esconderErroFormulario);
+  document.getElementById('fData').addEventListener('change', esconderErroFormulario);
+
+  // aba de almoço
+  document.getElementById('filtroAlmocoData').addEventListener('change', renderTabelaAlmoco);
+  document.getElementById('filtroAlmocoColaborador').addEventListener('change', renderTabelaAlmoco);
+  renderFiltroAlmocoColaborador();
+
+  const autoBackupToggle = document.getElementById('autoBackupToggle');
+  autoBackupToggle.checked = autoBackupAtivo();
+  autoBackupToggle.addEventListener('change', alternarAutoBackup);
+  atualizarStatusAutoBackup();
+  setInterval(verificarBackupAutomatico, 30000);
+
+  ['fOperador','fObs'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if(e.key === 'Enter') addRegistro();
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){
+      if(document.getElementById('confirmModal').style.display !== 'none'){
+        fecharConfirmModal();
+      }else if(document.getElementById('editModal').style.display !== 'none'){
+        fecharModal();
+      }else if(document.getElementById('editAlmocoModal').style.display !== 'none'){
+        fecharModalAlmoco();
+      }
+    }
+  });
+
+  document.getElementById('confirmModalYes').addEventListener('click', () => {
+    const cb = confirmCallback;
+    fecharConfirmModal();
+    if(cb) cb();
+  });
+
+  renderAll();
+  carregarDadosNuvem();
+  setupRealtime();
+}
+init();
+</script>
+</body>
+</html>
