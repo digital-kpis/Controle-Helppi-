@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Helppis</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <style>
   :root{
     --bg:#0f1115;
@@ -242,6 +244,8 @@
   <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">🗂 Helppis</button>
   <button class="tab-btn" id="tabBtnAlmoco" onclick="mudarAba('almoco')">🍽 Horário de Almoço</button>
   <button class="tab-btn" id="tabBtnVagas" onclick="mudarAba('vagas')">📊 Vagas</button>
+  <button class="tab-btn" id="tabBtnProdutividade" onclick="mudarAba('produtividade')">📈 Produtividade</button>
+  <button class="tab-btn" id="tabBtnIfood" onclick="mudarAba('ifood')">📱 Acesso iFood</button>
 </div>
 
 <div id="abaHelppis" class="aba">
@@ -391,8 +395,8 @@
       <input type="number" id="fVagaPreenchido" min="0" placeholder="0">
     </div>
     <div class="field">
-      <label>Sem aceite</label>
-      <input type="number" id="fVagaSemAceite" min="0" placeholder="0">
+      <label>Faltas do dia</label>
+      <input type="number" id="fVagaFaltas" min="0" placeholder="0">
     </div>
     <div class="field" style="flex:2;">
       <label>Observação (opcional)</label>
@@ -424,13 +428,13 @@
   <div class="stats">
     <div class="stat"><b id="statVagaOrcado">0</b>orçadas (período)</div>
     <div class="stat"><b id="statVagaPreenchido">0</b>preenchidas (período)</div>
-    <div class="stat"><b id="statVagaSemAceite">0</b>sem aceite (período)</div>
+    <div class="stat"><b id="statVagaFaltas">0</b>faltas (período)</div>
     <div class="stat"><b id="statVagaPct">0%</b>preenchimento</div>
   </div>
   <div style="overflow-x:auto;">
     <table>
       <thead>
-        <tr><th>Data</th><th>Orçadas</th><th>Preenchidas</th><th>Sem aceite</th><th>Faltando</th><th>% Preenchido</th><th>Observação</th><th></th></tr>
+        <tr><th>Data</th><th>Orçadas</th><th>Preenchidas</th><th>Faltas</th><th>Vagas em aberto</th><th>% Preenchido</th><th>Observação</th><th></th></tr>
       </thead>
       <tbody id="tbodyVagas"></tbody>
     </table>
@@ -439,6 +443,101 @@
 </div>
 
 </div><!-- fim #abaVagas -->
+
+<div id="abaProdutividade" class="aba" style="display:none;">
+
+<!-- IMPORTAR PLANILHAS -->
+<div class="panel">
+  <h2>Importar planilhas de produtividade</h2>
+  <div class="hint">
+    Envie aqui a(s) planilha(s) de pedidos separados (colunas como "separador", "início da separação", "total de itens").
+    Só são processados os pedidos cuja coluna "separador" traz um código de terminal (ex: "helppi13") — eles são
+    cruzados com o histórico da aba Helppis (Helppi + data + horário) para descobrir automaticamente qual operador
+    estava nele naquele momento. Pedidos que já vêm com o nome do operador na planilha são ignorados.
+    Pedidos já importados antes (mesmo ID) não são contados de novo, então você pode subir planilhas repetidas ou de
+    períodos diferentes sem duplicar.
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <div class="file-input-wrap">
+      <button>⬆ Selecionar planilha(s) (.xlsx)</button>
+      <input type="file" id="produtividadeFile" accept=".xlsx,.xls" multiple onchange="processarPlanilhasProdutividade(event)">
+    </div>
+    <button class="danger" onclick="limparProdutividade()">Apagar dados de produtividade</button>
+  </div>
+  <div id="produtividadeStatus" class="hint" style="margin-top:8px;"></div>
+</div>
+
+<!-- PRODUTIVIDADE POR OPERADOR -->
+<div class="panel">
+  <h2>Produtividade por operador</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>De</label>
+      <input type="date" id="filtroProdDataIni">
+    </div>
+    <div class="field">
+      <label>Até</label>
+      <input type="date" id="filtroProdDataFim">
+    </div>
+    <div class="field" style="flex:2;">
+      <label>Operador</label>
+      <input type="text" id="filtroProdOperador" placeholder="Filtrar por nome">
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroProdutividade()">Limpar filtro</button>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button onclick="exportarProdutividadeCSV()">⬇ Exportar CSV</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="statProdPedidos">0</b>pedidos (período)</div>
+    <div class="stat"><b id="statProdOperadores">0</b>operadores identificados</div>
+    <div class="stat"><b id="statProdSemOperador">0</b>pedidos sem operador</div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Helppi</th><th>Operador</th><th>Data</th><th>Pedidos</th><th>Itens totais</th><th>Tempo médio</th></tr>
+      </thead>
+      <tbody id="tbodyProdutividade"></tbody>
+    </table>
+  </div>
+  <div id="emptyProdMsg" class="empty" style="display:none;">Nenhum dado de produtividade encontrado. Importe uma planilha acima.</div>
+  <div id="produtividadeInfo" class="hint" style="margin-top:8px;"></div>
+</div>
+
+</div><!-- fim #abaProdutividade -->
+
+<div id="abaIfood" class="aba" style="display:none;">
+<div class="panel">
+  <h2>📱 Acesso ao Separador iFood</h2>
+  <div class="hint">
+    Peça para o operador escanear o QR code abaixo com a câmera do celular para abrir a página de login do
+    separador do iFood, e usar o usuário e senha informados logo abaixo.
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:16px; margin-top:18px;">
+    <div style="background:#fff; padding:16px; border-radius:12px; width:220px; height:220px; display:flex; align-items:center; justify-content:center;">
+      <canvas id="ifoodQrCanvas" width="188" height="188"></canvas>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:15px; color:var(--muted, #9aa4b2); margin-bottom:4px;">Ou acesse diretamente pelo link:</div>
+      <a href="https://separador.ifood.com.br" target="_blank" rel="noopener" style="font-size:17px; font-weight:700; color:var(--accent, #4f8cff); text-decoration:none;">separador.ifood.com.br</a>
+    </div>
+  </div>
+
+  <div style="max-width:360px; margin:26px auto 0; display:flex; flex-direction:column; gap:12px;">
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:14px 16px;">
+      <div style="font-size:13px; color:var(--muted, #9aa4b2); text-transform:uppercase; letter-spacing:.04em;">Usuário</div>
+      <div style="font-size:18px; font-weight:700; margin-top:2px; word-break:break-all;" id="ifoodUsuarioTexto">2840669_helppixx</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:14px 16px;">
+      <div style="font-size:13px; color:var(--muted, #9aa4b2); text-transform:uppercase; letter-spacing:.04em;">Senha</div>
+      <div style="font-size:18px; font-weight:700; margin-top:2px; word-break:break-all;" id="ifoodSenhaTexto">Maracana@2025</div>
+    </div>
+  </div>
+</div>
+</div><!-- fim #abaIfood -->
 
 <!-- BACKUP -->
 <div class="panel">
@@ -571,8 +670,8 @@
       <input type="number" id="editVagaPreenchido" min="0">
     </div>
     <div class="field">
-      <label>Sem aceite</label>
-      <input type="number" id="editVagaSemAceite" min="0">
+      <label>Faltas do dia</label>
+      <input type="number" id="editVagaFaltas" min="0">
     </div>
     <div class="field">
       <label>Observação</label>
@@ -602,6 +701,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let _registrosCache = null;
 let _almocoCache = null;
 let _vagasCache = null;
+let _produtividadeCache = null;
 let cloudSyncOk = true;
 
 // Envia a lista inteira (registros ou almoco) para a nuvem. Silencioso em caso
@@ -627,7 +727,7 @@ async function pushToCloud(id, value){
 // se a nuvem já tiver dados; caso contrário, envia o que existir localmente).
 async function carregarDadosNuvem(){
   try{
-    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco', 'vagas']);
+    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco', 'vagas', 'produtividade']);
     if(error) throw error;
     const map = {};
     (data || []).forEach(row => { map[row.id] = row.value; });
@@ -653,10 +753,28 @@ async function carregarDadosNuvem(){
       await pushToCloud('vagas', getVagasRegistros());
     }
 
+    if(map.produtividade !== undefined){
+      // mescla em vez de sobrescrever: se o usuário importou uma planilha localmente
+      // enquanto essa busca na nuvem ainda estava em andamento, isso evita apagar
+      // o que acabou de ser importado (só adiciona o que vier da nuvem e ainda não existe aqui)
+      const cloudList = map.produtividade || [];
+      const localList = getProdutividadePedidos();
+      const idsLocais = new Set(localList.map(p => p.pedidoId));
+      const novosDaCloud = cloudList.filter(p => !idsLocais.has(p.pedidoId));
+      _produtividadeCache = novosDaCloud.length ? localList.concat(novosDaCloud) : localList;
+      localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(_produtividadeCache));
+      if(_produtividadeCache.length > cloudList.length){
+        await pushToCloud('produtividade', _produtividadeCache);
+      }
+    }else{
+      await pushToCloud('produtividade', getProdutividadePedidos());
+    }
+
     renderAll();
     renderAlmocoTudo();
     renderFiltroAlmocoColaborador();
     renderVagasTudo();
+    renderProdutividade();
     updateBackupInfo();
     cloudSyncOk = true;
   }catch(err){
@@ -677,6 +795,7 @@ function setupRealtime(){
         _registrosCache = row.value || [];
         localStorage.setItem(STORAGE_KEY, JSON.stringify(_registrosCache));
         renderAll();
+        renderProdutividade();
         updateBackupInfo();
       }else if(row.id === 'almoco'){
         _almocoCache = row.value || [];
@@ -688,6 +807,20 @@ function setupRealtime(){
         _vagasCache = row.value || [];
         localStorage.setItem(VAGAS_KEY, JSON.stringify(_vagasCache));
         renderVagasTudo();
+        updateBackupInfo();
+      }else if(row.id === 'produtividade'){
+        // mescla em vez de sobrescrever: um eco da própria gravação (ou uma
+        // atualização atrasada/incompleta vinda da nuvem) nunca deve apagar
+        // pedidos que já estão salvos neste dispositivo
+        const incoming = Array.isArray(row.value) ? row.value : [];
+        const localList = getProdutividadePedidos();
+        const idsLocais = new Set(localList.map(p => p.pedidoId));
+        const novos = incoming.filter(p => p && p.pedidoId && !idsLocais.has(p.pedidoId));
+        if(novos.length){
+          _produtividadeCache = localList.concat(novos);
+          localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(_produtividadeCache));
+          renderProdutividade();
+        }
         updateBackupInfo();
       }
     })
@@ -788,16 +921,24 @@ function mudarAba(nome){
   const abaHelppis = document.getElementById('abaHelppis');
   const abaAlmoco = document.getElementById('abaAlmoco');
   const abaVagas = document.getElementById('abaVagas');
+  const abaProdutividade = document.getElementById('abaProdutividade');
+  const abaIfood = document.getElementById('abaIfood');
   const btnHelppis = document.getElementById('tabBtnHelppis');
   const btnAlmoco = document.getElementById('tabBtnAlmoco');
   const btnVagas = document.getElementById('tabBtnVagas');
+  const btnProdutividade = document.getElementById('tabBtnProdutividade');
+  const btnIfood = document.getElementById('tabBtnIfood');
 
   abaHelppis.style.display = 'none';
   abaAlmoco.style.display = 'none';
   abaVagas.style.display = 'none';
+  abaProdutividade.style.display = 'none';
+  abaIfood.style.display = 'none';
   btnHelppis.classList.remove('active');
   btnAlmoco.classList.remove('active');
   btnVagas.classList.remove('active');
+  btnProdutividade.classList.remove('active');
+  btnIfood.classList.remove('active');
 
   if(nome === 'almoco'){
     abaAlmoco.style.display = 'block';
@@ -807,6 +948,13 @@ function mudarAba(nome){
     abaVagas.style.display = 'block';
     btnVagas.classList.add('active');
     renderVagasTudo();
+  }else if(nome === 'produtividade'){
+    abaProdutividade.style.display = 'block';
+    btnProdutividade.classList.add('active');
+    renderProdutividade();
+  }else if(nome === 'ifood'){
+    abaIfood.style.display = 'block';
+    btnIfood.classList.add('active');
   }else{
     abaHelppis.style.display = 'block';
     btnHelppis.classList.add('active');
@@ -1135,18 +1283,27 @@ function renderTable(){
   const helppiFiltro = document.getElementById('filtroHelppi').value;
   const opFiltro = document.getElementById('filtroOperador').value.trim().toLowerCase();
 
-  let list = getRegistros();
+  const tbody = document.getElementById('tbody');
+  const emptyMsg = document.getElementById('emptyMsg');
 
-  if(dataFiltro) list = list.filter(r => r.data === dataFiltro);
+  if(!dataFiltro){
+    tbody.innerHTML = '';
+    emptyMsg.textContent = 'Selecione uma data no filtro acima para ver o histórico.';
+    emptyMsg.style.display = 'block';
+    return;
+  }
+
+  let list = getRegistros().filter(r => r.data === dataFiltro);
+
   if(helppiFiltro) list = list.filter(r => r.helppi === helppiFiltro);
   if(opFiltro) list = list.filter(r => r.operador.toLowerCase().includes(opFiltro));
 
   list.sort((a,b) => (b.data+b.hora).localeCompare(a.data+a.hora));
 
-  const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
 
-  document.getElementById('emptyMsg').style.display = list.length ? 'none' : 'block';
+  emptyMsg.textContent = 'Nenhum registro encontrado.';
+  emptyMsg.style.display = list.length ? 'none' : 'block';
 
   list.forEach(r => {
     const tr = document.createElement('tr');
@@ -1480,7 +1637,7 @@ function renderTabelaAlmoco(){
   });
 }
 
-// ---- VAGAS (orçadas / preenchidas / sem aceite por dia) ----
+// ---- VAGAS (orçadas / preenchidas / faltas por dia) ----
 
 function mostrarErroFormVaga(msg){
   const el = document.getElementById('formVagaErro');
@@ -1498,15 +1655,15 @@ function addVaga(){
   const data = document.getElementById('fVagaData').value;
   const orcado = document.getElementById('fVagaOrcado').value;
   const preenchido = document.getElementById('fVagaPreenchido').value;
-  const semAceite = document.getElementById('fVagaSemAceite').value;
+  const faltas = document.getElementById('fVagaFaltas').value;
   const obs = document.getElementById('fVagaObs').value.trim();
 
   if(!data){
     mostrarErroFormVaga('Informe a data.');
     return;
   }
-  if(orcado === '' || preenchido === '' || semAceite === ''){
-    mostrarErroFormVaga('Preencha vagas orçadas, preenchidas e sem aceite (use 0 se não houver).');
+  if(orcado === '' || preenchido === ''){
+    mostrarErroFormVaga('Preencha vagas orçadas e preenchidas (use 0 se não houver).');
     return;
   }
 
@@ -1516,7 +1673,7 @@ function addVaga(){
     data,
     orcado: Number(orcado) || 0,
     preenchido: Number(preenchido) || 0,
-    semAceite: Number(semAceite) || 0,
+    faltas: Number(faltas) || 0,
     obs
   };
 
@@ -1526,7 +1683,7 @@ function addVaga(){
 
   document.getElementById('fVagaOrcado').value = '';
   document.getElementById('fVagaPreenchido').value = '';
-  document.getElementById('fVagaSemAceite').value = '';
+  document.getElementById('fVagaFaltas').value = '';
   document.getElementById('fVagaObs').value = '';
 
   renderVagasTudo();
@@ -1552,7 +1709,7 @@ function abrirEdicaoVaga(id){
   document.getElementById('editVagaData').value = reg.data;
   document.getElementById('editVagaOrcado').value = reg.orcado;
   document.getElementById('editVagaPreenchido').value = reg.preenchido;
-  document.getElementById('editVagaSemAceite').value = reg.semAceite;
+  document.getElementById('editVagaFaltas').value = reg.faltas || 0;
   document.getElementById('editVagaObs').value = reg.obs || '';
   document.getElementById('editVagaErro').style.display = 'none';
   document.getElementById('editVagaModal').style.display = 'flex';
@@ -1575,15 +1732,15 @@ function salvarEdicaoVaga(){
   const data = document.getElementById('editVagaData').value;
   const orcado = document.getElementById('editVagaOrcado').value;
   const preenchido = document.getElementById('editVagaPreenchido').value;
-  const semAceite = document.getElementById('editVagaSemAceite').value;
+  const faltas = document.getElementById('editVagaFaltas').value;
   const obs = document.getElementById('editVagaObs').value.trim();
 
   if(!data){
     mostrarErroEdicaoVaga('Informe a data.');
     return;
   }
-  if(orcado === '' || preenchido === '' || semAceite === ''){
-    mostrarErroEdicaoVaga('Preencha vagas orçadas, preenchidas e sem aceite (use 0 se não houver).');
+  if(orcado === '' || preenchido === ''){
+    mostrarErroEdicaoVaga('Preencha vagas orçadas e preenchidas (use 0 se não houver).');
     return;
   }
 
@@ -1591,7 +1748,7 @@ function salvarEdicaoVaga(){
   const idx = lista.findIndex(r => r.id === editandoVagaId);
   if(idx === -1) return;
 
-  lista[idx] = { ...lista[idx], data, orcado: Number(orcado)||0, preenchido: Number(preenchido)||0, semAceite: Number(semAceite)||0, obs };
+  lista[idx] = { ...lista[idx], data, orcado: Number(orcado)||0, preenchido: Number(preenchido)||0, faltas: Number(faltas)||0, obs };
   saveVagasRegistros(lista);
   fecharModalVaga();
   renderVagasTudo();
@@ -1629,14 +1786,14 @@ function renderVagasTudo(){
   tbody.innerHTML = '';
   document.getElementById('emptyVagasMsg').style.display = lista.length ? 'none' : 'block';
 
-  let totalOrcado = 0, totalPreenchido = 0, totalSemAceite = 0;
+  let totalOrcado = 0, totalPreenchido = 0, totalFaltas = 0;
 
   lista.forEach(r => {
     totalOrcado += r.orcado;
     totalPreenchido += r.preenchido;
-    totalSemAceite += r.semAceite;
+    totalFaltas += (r.faltas || 0);
 
-    const faltando = Math.max(r.orcado - r.preenchido, 0);
+    const vagasEmAberto = Math.max(r.orcado - r.preenchido, 0);
     const pct = r.orcado > 0 ? Math.round((r.preenchido / r.orcado) * 100) : 0;
 
     const tr = document.createElement('tr');
@@ -1644,8 +1801,8 @@ function renderVagasTudo(){
       <td>${formatDate(r.data)}</td>
       <td>${r.orcado}</td>
       <td>${r.preenchido}</td>
-      <td>${r.semAceite}</td>
-      <td>${faltando}</td>
+      <td>${r.faltas || 0}</td>
+      <td>${vagasEmAberto}</td>
       <td>${pct}%</td>
       <td>${escapeHtml(r.obs) || '—'}</td>
       <td>
@@ -1658,7 +1815,7 @@ function renderVagasTudo(){
 
   document.getElementById('statVagaOrcado').textContent = totalOrcado;
   document.getElementById('statVagaPreenchido').textContent = totalPreenchido;
-  document.getElementById('statVagaSemAceite').textContent = totalSemAceite;
+  document.getElementById('statVagaFaltas').textContent = totalFaltas;
   document.getElementById('statVagaPct').textContent = totalOrcado > 0
     ? Math.round((totalPreenchido / totalOrcado) * 100) + '%'
     : '0%';
@@ -1670,7 +1827,8 @@ function exportBackup(automatico){
     exportadoEm: new Date().toISOString(),
     registros: getRegistros(),
     almocoRegistros: getAlmocoRegistros(),
-    vagasRegistros: getVagasRegistros()
+    vagasRegistros: getVagasRegistros(),
+    produtividadePedidos: getProdutividadePedidos()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1754,7 +1912,8 @@ async function escreverBackupNoArquivoEscolhido(){
       exportadoEm: new Date().toISOString(),
       registros: getRegistros(),
       almocoRegistros: getAlmocoRegistros(),
-      vagasRegistros: getVagasRegistros()
+      vagasRegistros: getVagasRegistros(),
+      produtividadePedidos: getProdutividadePedidos()
     };
     const writable = await autoBackupFileHandle.createWritable();
     await writable.write(JSON.stringify(dados, null, 2));
@@ -1846,9 +2005,11 @@ async function importBackup(event){
   let registrosCombinados = [];
   let almocoCombinados = [];
   let vagasCombinados = [];
+  let produtividadeCombinados = [];
   const idsVistos = new Set();
   const almocoIdsVistos = new Set();
   const vagasIdsVistos = new Set();
+  const produtividadeIdsVistos = new Set();
   const arquivosComErro = [];
 
   for(const file of files){
@@ -1858,6 +2019,7 @@ async function importBackup(event){
       const registros = Array.isArray(parsed) ? parsed : (parsed.registros || []);
       const almocoRegistros = Array.isArray(parsed) ? [] : (parsed.almocoRegistros || []);
       const vagasRegistros = Array.isArray(parsed) ? [] : (parsed.vagasRegistros || []);
+      const produtividadePedidos = Array.isArray(parsed) ? [] : (parsed.produtividadePedidos || []);
 
       if(!Array.isArray(registros)) throw new Error('formato inválido');
 
@@ -1879,12 +2041,18 @@ async function importBackup(event){
           vagasCombinados.push(r);
         }
       });
+      produtividadePedidos.forEach(p => {
+        if(!produtividadeIdsVistos.has(p.pedidoId)){
+          produtividadeIdsVistos.add(p.pedidoId);
+          produtividadeCombinados.push(p);
+        }
+      });
     }catch(err){
       arquivosComErro.push(file.name);
     }
   }
 
-  const totalItens = registrosCombinados.length + almocoCombinados.length + vagasCombinados.length;
+  const totalItens = registrosCombinados.length + almocoCombinados.length + vagasCombinados.length + produtividadeCombinados.length;
 
   if(!totalItens){
     showToast('Nenhum dado válido encontrado nos arquivo(s) selecionado(s).');
@@ -1893,7 +2061,7 @@ async function importBackup(event){
   }
 
   pedirConfirmacao(
-    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi, ${almocoCombinados.length} lançamento(s) de almoço e ${vagasCombinados.length} registro(s) de vagas, de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
+    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi, ${almocoCombinados.length} lançamento(s) de almoço, ${vagasCombinados.length} registro(s) de vagas e ${produtividadeCombinados.length} pedido(s) de produtividade, de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
     'Confirmar = Mesclar com os dados atuais. Para SUBSTITUIR tudo em vez de mesclar, clique em Cancelar e use "Apagar todos os dados" antes de importar.',
     () => {
       const registrosAtuais = getRegistros();
@@ -1911,9 +2079,15 @@ async function importBackup(event){
       const novasVagas = vagasCombinados.filter(r => !idsVagasAtuais.has(r.id));
       saveVagasRegistros(vagasAtuais.concat(novasVagas));
 
+      const produtividadeAtuais = getProdutividadePedidos();
+      const idsProdutividadeAtuais = new Set(produtividadeAtuais.map(p => p.pedidoId));
+      const novosProdutividade = produtividadeCombinados.filter(p => !idsProdutividadeAtuais.has(p.pedidoId));
+      saveProdutividadePedidos(produtividadeAtuais.concat(novosProdutividade));
+
       renderAll();
       renderAlmocoTudo();
       renderVagasTudo();
+      renderProdutividade();
 
       let msg = `Importação concluída: ${totalItens} item(ns) processado(s).`;
       if(arquivosComErro.length){
@@ -1946,9 +2120,294 @@ function updateBackupInfo(){
   const total = getRegistros().length;
   const totalAlmoco = getAlmocoRegistros().length;
   const totalVagas = getVagasRegistros().length;
+  const totalProdutividade = getProdutividadePedidos().length;
   const infoEl = document.getElementById('backupInfo');
   const lastStr = last ? new Date(last).toLocaleString('pt-BR') : 'nenhum backup gerado ainda';
-  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Registros de vagas: ${totalVagas} · Último backup: ${lastStr}`;
+  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Registros de vagas: ${totalVagas} · Pedidos de produtividade: ${totalProdutividade} · Último backup: ${lastStr}`;
+}
+
+// ---- PRODUTIVIDADE (cruzamento das planilhas de pedidos com o histórico de Helppis) ----
+const PRODUTIVIDADE_KEY = 'helppi_produtividade_pedidos_v1';
+
+function getProdutividadePedidos(){
+  if(_produtividadeCache !== null) return _produtividadeCache;
+  try{
+    _produtividadeCache = JSON.parse(localStorage.getItem(PRODUTIVIDADE_KEY)) || [];
+  }catch(e){ _produtividadeCache = []; }
+  return _produtividadeCache;
+}
+function saveProdutividadePedidos(list){
+  _produtividadeCache = list;
+  localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(list));
+  pushToCloud('produtividade', list);
+}
+
+// Converte "17-07-2026 09:04:32" (ou só a data) em { data:'2026-07-17', hora:'09:04' }
+function parseDataHoraBR(str){
+  if(!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{2})-(\d{2})-(\d{4})[ T]?(\d{2}):(\d{2})/);
+  if(!m) return null;
+  const [, d, mo, y, h, mi] = m;
+  return { data: `${y}-${mo}-${d}`, hora: `${h}:${mi}` };
+}
+
+// "Helppi03" / "HELPPI 17" / "helppi13" -> "03" / "17" / "13"
+function extrairNumeroHelppi(separador){
+  if(!separador) return null;
+  const m = String(separador).match(/(\d+)/);
+  if(!m) return null;
+  return pad2(parseInt(m[1], 10));
+}
+
+// true se o valor da coluna "separador" é um código de terminal (ex: "helppi13", "HELPPI 17")
+// em vez de já ser o nome do operador (algumas planilhas trazem o nome direto).
+function separadorEhTerminalHelppi(valor){
+  return /^helppi\s*\d+$/i.test(String(valor || '').trim());
+}
+
+function titleCasePt(str){
+  const minusculas = new Set(['de','da','do','das','dos','e']);
+  return String(str).trim().toLowerCase().split(/\s+/).filter(Boolean).map((w,i) => {
+    if(i > 0 && minusculas.has(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+// Descobre qual operador estava no Helppi numa data/hora específica, olhando o
+// histórico de lançamentos da aba Helppis (o lançamento mais recente com horário
+// menor ou igual ao horário do pedido é considerado o operador em uso no momento).
+function operadorNoMomento(helppiNum, data, hora){
+  if(!helppiNum || !data) return { operador: null, inferido: false };
+  const doHelppi = getRegistros().filter(r => r.helppi === helppiNum);
+
+  const registrosDia = doHelppi
+    .filter(r => r.data === data)
+    .sort((a,b) => a.hora.localeCompare(b.hora));
+
+  let candidato = null;
+  for(const r of registrosDia){
+    if(!hora || r.hora <= hora) candidato = r;
+    else break;
+  }
+  if(candidato) return { operador: candidato.operador, inferido: false };
+
+  // nenhum lançamento no mesmo dia até esse horário (turno começou antes da meia-noite,
+  // ou o lançamento na aba Helppis foi feito com atraso) -> usa o último lançamento
+  // anterior a essa data como melhor estimativa
+  const anteriores = doHelppi
+    .filter(r => r.data < data)
+    .sort((a,b) => (a.data + a.hora).localeCompare(b.data + b.hora));
+  if(anteriores.length){
+    return { operador: anteriores[anteriores.length - 1].operador, inferido: true };
+  }
+
+  return { operador: null, inferido: false };
+}
+
+async function processarPlanilhasProdutividade(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+
+  const statusEl = document.getElementById('produtividadeStatus');
+
+  if(typeof XLSX === 'undefined'){
+    statusEl.textContent = '⚠ Não foi possível carregar a biblioteca de leitura de planilhas (verifique sua conexão com a internet e recarregue a página).';
+    showToast('Falha ao carregar biblioteca de planilhas.');
+    event.target.value = '';
+    return;
+  }
+
+  statusEl.textContent = 'Lendo planilha(s)...';
+
+  const existentes = getProdutividadePedidos();
+  const idsExistentes = new Set(existentes.map(p => p.pedidoId));
+  const novosPedidos = [];
+  let semCorrespondencia = 0;
+  let ignoradosCancelados = 0;
+  let ignoradosComNome = 0;
+  let inferidosDiaAnterior = 0;
+  const arquivosComErro = [];
+
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      linhas.forEach(linha => {
+        const norm = {};
+        Object.keys(linha).forEach(k => { norm[k.trim().toLowerCase()] = linha[k]; });
+
+        const pedidoId = String(norm['id do pedido'] || norm['número do pedido'] || '').trim();
+        if(!pedidoId || idsExistentes.has(pedidoId)) return;
+        idsExistentes.add(pedidoId); // trava o pedido assim que visto, mesmo que a linha seja ignorada por outro motivo
+        // (evita contar o mesmo pedido 2x quando ele aparece em mais de uma linha, ex: separação dividida entre duas pessoas)
+
+        const cancelado = String(norm['cancelamento sem separação'] || '').trim().toUpperCase();
+        if(cancelado === 'SIM'){ ignoradosCancelados++; return; }
+
+        const inicio = parseDataHoraBR(norm['início da separação']) || parseDataHoraBR(norm['data (referente ao pedido)']);
+        if(!inicio) return;
+
+        const separadorRaw = norm['separador'];
+        if(!separadorEhTerminalHelppi(separadorRaw)){ ignoradosComNome++; return; } // ignora pedidos que já vêm com nome do operador
+
+        const helppiNum = extrairNumeroHelppi(separadorRaw);
+        const resultado = helppiNum ? operadorNoMomento(helppiNum, inicio.data, inicio.hora) : { operador: null, inferido: false };
+        const operador = resultado.operador;
+
+        if(!operador) semCorrespondencia++;
+        if(operador && resultado.inferido) inferidosDiaAnterior++;
+
+        novosPedidos.push({
+          pedidoId,
+          operador: operador || null,
+          inferido: !!(operador && resultado.inferido),
+          helppi: helppiNum,
+          data: inicio.data,
+          hora: inicio.hora,
+          itens: Number(norm['total de itens']) || 0,
+          tempoSeparacao: Number(norm['tempo de separação (em minutos)']) || 0,
+          canal: norm['canal de vendas'] || ''
+        });
+      });
+    }catch(err){
+      arquivosComErro.push(file.name);
+    }
+  }
+
+  saveProdutividadePedidos(existentes.concat(novosPedidos));
+
+  let msg = `${novosPedidos.length} pedido(s) novo(s) processado(s) de ${files.length - arquivosComErro.length} arquivo(s).`;
+  if(ignoradosComNome) msg += ` ${ignoradosComNome} ignorado(s) por já virem com nome de operador (fora do escopo).`;
+  if(ignoradosCancelados) msg += ` ${ignoradosCancelados} cancelado(s) ignorado(s).`;
+  if(inferidosDiaAnterior) msg += ` ${inferidosDiaAnterior} identificado(s) pelo último lançamento de um dia anterior (sem lançamento no próprio dia até aquele horário).`;
+  if(semCorrespondencia) msg += ` ${semCorrespondencia} sem operador identificado (nenhum lançamento de Helppi encontrado, nem no dia nem antes).`;
+  if(arquivosComErro.length) msg += ` Falha ao ler: ${arquivosComErro.join(', ')}.`;
+  statusEl.textContent = msg;
+  showToast('Planilha(s) processada(s).');
+  updateBackupInfo();
+
+  event.target.value = '';
+  renderProdutividade();
+}
+
+function limparProdutividade(){
+  pedirConfirmacao(
+    'Isso vai apagar todos os dados de produtividade importados (os registros da aba Helppis não são afetados). Deseja continuar?',
+    () => {
+      saveProdutividadePedidos([]);
+      renderProdutividade();
+      updateBackupInfo();
+      showToast('Dados de produtividade apagados.');
+    }
+  );
+}
+
+function agregarProdutividade(pedidos){
+  const mapa = new Map();
+  pedidos.forEach(p => {
+    const chave = `${p.helppi || '—'}||${p.data}`;
+    if(!mapa.has(chave)){
+      mapa.set(chave, { helppi: p.helppi || '—', operador: p.operador || 'Não identificado', data: p.data, pedidos: 0, itens: 0, tempoTotal: 0, inferidos: 0 });
+    }
+    const item = mapa.get(chave);
+    item.pedidos += 1;
+    item.itens += p.itens;
+    item.tempoTotal += p.tempoSeparacao;
+    if(p.inferido) item.inferidos += 1;
+    // se o operador só foi identificado em algumas linhas do mesmo Helppi/dia, guarda o nome assim que aparecer
+    if(item.operador === 'Não identificado' && p.operador) item.operador = p.operador;
+  });
+  return Array.from(mapa.values());
+}
+
+function filtrarPedidosProdutividade(){
+  const dataIni = document.getElementById('filtroProdDataIni').value;
+  const dataFim = document.getElementById('filtroProdDataFim').value;
+  const filtroOperador = (document.getElementById('filtroProdOperador').value || '').trim().toLowerCase();
+
+  let pedidos = getProdutividadePedidos();
+  if(dataIni) pedidos = pedidos.filter(p => p.data >= dataIni);
+  if(dataFim) pedidos = pedidos.filter(p => p.data <= dataFim);
+  if(filtroOperador){
+    pedidos = pedidos.filter(p => (p.operador || 'não identificado').toLowerCase().includes(filtroOperador));
+  }
+  return pedidos;
+}
+
+function renderProdutividade(){
+  const pedidos = filtrarPedidosProdutividade();
+  const agregados = agregarProdutividade(pedidos)
+    .sort((a,b) => b.data.localeCompare(a.data) || String(a.helppi).localeCompare(String(b.helppi)));
+
+  const tbody = document.getElementById('tbodyProdutividade');
+  const emptyMsg = document.getElementById('emptyProdMsg');
+
+  if(!agregados.length){
+    tbody.innerHTML = '';
+    emptyMsg.style.display = 'block';
+  }else{
+    emptyMsg.style.display = 'none';
+    tbody.innerHTML = agregados.map(a => `
+      <tr>
+        <td>Helppi ${escapeHtml(a.helppi)}</td>
+        <td>${escapeHtml(a.operador)}${a.inferidos ? ` <span class="hint" title="${a.inferidos} pedido(s) identificado(s) pelo último lançamento de um dia anterior, sem lançamento próprio no dia até aquele horário">⚠ ${a.inferidos}</span>` : ''}</td>
+        <td>${formatDate(a.data)}</td>
+        <td>${a.pedidos}</td>
+        <td>${a.itens}</td>
+        <td>${a.pedidos ? Math.round(a.tempoTotal / a.pedidos) : 0} min</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('statProdPedidos').textContent = pedidos.length;
+  const operadoresUnicos = new Set(pedidos.filter(p => p.operador).map(p => p.operador));
+  document.getElementById('statProdOperadores').textContent = operadoresUnicos.size;
+  document.getElementById('statProdSemOperador').textContent = pedidos.filter(p => !p.operador).length;
+
+  const total = getProdutividadePedidos().length;
+  document.getElementById('produtividadeInfo').textContent = `Total de pedidos importados (todos os períodos, sem filtro): ${total}`;
+}
+
+function exportarProdutividadeCSV(){
+  const pedidos = filtrarPedidosProdutividade();
+  const agregados = agregarProdutividade(pedidos)
+    .sort((a,b) => b.data.localeCompare(a.data) || String(a.helppi).localeCompare(String(b.helppi)));
+
+  const linhas = ['Helppi;Operador;Data;Pedidos;Itens;Tempo medio (min)'];
+  agregados.forEach(a => {
+    linhas.push(`Helppi ${a.helppi};${a.operador};${formatDate(a.data)};${a.pedidos};${a.itens};${a.pedidos ? Math.round(a.tempoTotal / a.pedidos) : 0}`);
+  });
+  const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `produtividade_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function limparFiltroProdutividade(){
+  document.getElementById('filtroProdDataIni').value = '';
+  document.getElementById('filtroProdDataFim').value = '';
+  document.getElementById('filtroProdOperador').value = '';
+  renderProdutividade();
+}
+
+// ---- QR CODE (Acesso Separador iFood) ----
+function renderIfoodQr(){
+  const canvas = document.getElementById('ifoodQrCanvas');
+  if(!canvas || typeof QRCode === 'undefined') return;
+  QRCode.toCanvas(canvas, 'https://separador.ifood.com.br', {
+    width: 188,
+    margin: 0,
+    color: { dark: '#000000', light: '#ffffff' }
+  }, function(err){
+    if(err) console.error('Falha ao gerar QR code:', err);
+  });
 }
 
 // ---- INIT ----
@@ -1975,9 +2434,15 @@ function init(){
   document.getElementById('fVagaData').value = todayStr();
   document.getElementById('filtroVagaDataIni').addEventListener('change', renderVagasTudo);
   document.getElementById('filtroVagaDataFim').addEventListener('change', renderVagasTudo);
-  ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaSemAceite'].forEach(id => {
+  ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaFaltas'].forEach(id => {
     document.getElementById(id).addEventListener('change', esconderErroFormVaga);
   });
+
+  // aba de produtividade
+  document.getElementById('filtroProdDataIni').addEventListener('change', renderProdutividade);
+  document.getElementById('filtroProdDataFim').addEventListener('change', renderProdutividade);
+  document.getElementById('filtroProdOperador').addEventListener('input', renderProdutividade);
+  renderProdutividade();
 
   const autoBackupToggle = document.getElementById('autoBackupToggle');
   autoBackupToggle.checked = autoBackupAtivo();
@@ -2012,6 +2477,7 @@ function init(){
   });
 
   renderAll();
+  renderIfoodQr();
   carregarDadosNuvem();
   setupRealtime();
 }
