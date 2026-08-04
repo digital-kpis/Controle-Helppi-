@@ -380,7 +380,7 @@
 <!-- LANÇAR VAGAS DO DIA -->
 <div class="panel">
   <h2>Vagas do dia</h2>
-  <div class="hint">Cada lançamento é sempre um registro novo.</div>
+  <div class="hint">Cada lançamento é sempre um registro novo. "Vagas preenchidas" é calculado automaticamente pela quantidade de operadores com lançamento de Helppi na data escolhida.</div>
   <div class="row">
     <div class="field">
       <label>Data</label>
@@ -392,7 +392,7 @@
     </div>
     <div class="field">
       <label>Vagas preenchidas</label>
-      <input type="number" id="fVagaPreenchido" min="0" placeholder="0">
+      <input type="number" id="fVagaPreenchido" min="0" placeholder="0" readonly style="opacity:.75; cursor:not-allowed;">
     </div>
     <div class="field">
       <label>Faltas do dia</label>
@@ -948,6 +948,7 @@ function mudarAba(nome){
     abaVagas.style.display = 'block';
     btnVagas.classList.add('active');
     renderVagasTudo();
+    atualizarVagaPreenchidoAutomatico();
   }else if(nome === 'produtividade'){
     abaProdutividade.style.display = 'block';
     btnProdutividade.classList.add('active');
@@ -1649,6 +1650,20 @@ function esconderErroFormVaga(){
 }
 
 // Sempre cria um lançamento novo (nunca sobrescreve um registro existente).
+function atualizarVagaPreenchidoAutomatico(){
+  const data = document.getElementById('fVagaData').value;
+  const campo = document.getElementById('fVagaPreenchido');
+  if(!data){
+    campo.value = '';
+    return;
+  }
+  // "vagas preenchidas" = quantidade de operadores distintos com lançamento de Helppi nessa data
+  const operadoresUnicos = new Set(
+    getRegistros().filter(r => r.data === data).map(r => r.operador)
+  );
+  campo.value = operadoresUnicos.size;
+}
+
 function addVaga(){
   esconderErroFormVaga();
 
@@ -1682,9 +1697,9 @@ function addVaga(){
   saveVagasRegistros(lista);
 
   document.getElementById('fVagaOrcado').value = '';
-  document.getElementById('fVagaPreenchido').value = '';
   document.getElementById('fVagaFaltas').value = '';
   document.getElementById('fVagaObs').value = '';
+  atualizarVagaPreenchidoAutomatico();
 
   renderVagasTudo();
   showToast(msg);
@@ -2434,6 +2449,8 @@ function init(){
   document.getElementById('fVagaData').value = todayStr();
   document.getElementById('filtroVagaDataIni').addEventListener('change', renderVagasTudo);
   document.getElementById('filtroVagaDataFim').addEventListener('change', renderVagasTudo);
+  document.getElementById('fVagaData').addEventListener('change', atualizarVagaPreenchidoAutomatico);
+  atualizarVagaPreenchidoAutomatico();
   ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaFaltas'].forEach(id => {
     document.getElementById(id).addEventListener('change', esconderErroFormVaga);
   });
