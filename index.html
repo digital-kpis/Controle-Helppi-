@@ -395,6 +395,14 @@
       <input type="number" id="fVagaPreenchido" min="0" placeholder="0" readonly style="opacity:.75; cursor:not-allowed;">
     </div>
     <div class="field">
+      <label>Presença</label>
+      <input type="number" id="fVagaPresenca" min="0" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Em aberto</label>
+      <input type="number" id="fVagaEmAberto" min="0" placeholder="0">
+    </div>
+    <div class="field">
       <label>Faltas do dia</label>
       <input type="number" id="fVagaFaltas" min="0" placeholder="0">
     </div>
@@ -434,7 +442,7 @@
   <div style="overflow-x:auto;">
     <table>
       <thead>
-        <tr><th>Data</th><th>Orçadas</th><th>Preenchidas</th><th>Faltas</th><th>Vagas em aberto</th><th>% Preenchido</th><th>Observação</th><th></th></tr>
+        <tr><th>Data</th><th>Orçadas</th><th>Preenchidas</th><th>Presença</th><th>Em aberto</th><th>Faltas</th><th>% Preenchido</th><th>Observação</th><th></th></tr>
       </thead>
       <tbody id="tbodyVagas"></tbody>
     </table>
@@ -668,6 +676,14 @@
     <div class="field">
       <label>Vagas preenchidas</label>
       <input type="number" id="editVagaPreenchido" min="0">
+    </div>
+    <div class="field">
+      <label>Presença</label>
+      <input type="number" id="editVagaPresenca" min="0">
+    </div>
+    <div class="field">
+      <label>Em aberto</label>
+      <input type="number" id="editVagaEmAberto" min="0">
     </div>
     <div class="field">
       <label>Faltas do dia</label>
@@ -1670,6 +1686,8 @@ function addVaga(){
   const data = document.getElementById('fVagaData').value;
   const orcado = document.getElementById('fVagaOrcado').value;
   const preenchido = document.getElementById('fVagaPreenchido').value;
+  const presenca = document.getElementById('fVagaPresenca').value;
+  const emAberto = document.getElementById('fVagaEmAberto').value;
   const faltas = document.getElementById('fVagaFaltas').value;
   const obs = document.getElementById('fVagaObs').value.trim();
 
@@ -1688,6 +1706,8 @@ function addVaga(){
     data,
     orcado: Number(orcado) || 0,
     preenchido: Number(preenchido) || 0,
+    presenca: presenca === '' ? null : Number(presenca) || 0,
+    emAberto: emAberto === '' ? null : Number(emAberto) || 0,
     faltas: Number(faltas) || 0,
     obs
   };
@@ -1697,6 +1717,8 @@ function addVaga(){
   saveVagasRegistros(lista);
 
   document.getElementById('fVagaOrcado').value = '';
+  document.getElementById('fVagaPresenca').value = '';
+  document.getElementById('fVagaEmAberto').value = '';
   document.getElementById('fVagaFaltas').value = '';
   document.getElementById('fVagaObs').value = '';
   atualizarVagaPreenchidoAutomatico();
@@ -1724,6 +1746,8 @@ function abrirEdicaoVaga(id){
   document.getElementById('editVagaData').value = reg.data;
   document.getElementById('editVagaOrcado').value = reg.orcado;
   document.getElementById('editVagaPreenchido').value = reg.preenchido;
+  document.getElementById('editVagaPresenca').value = reg.presenca === null || reg.presenca === undefined ? '' : reg.presenca;
+  document.getElementById('editVagaEmAberto').value = reg.emAberto === null || reg.emAberto === undefined ? '' : reg.emAberto;
   document.getElementById('editVagaFaltas').value = reg.faltas || 0;
   document.getElementById('editVagaObs').value = reg.obs || '';
   document.getElementById('editVagaErro').style.display = 'none';
@@ -1747,6 +1771,8 @@ function salvarEdicaoVaga(){
   const data = document.getElementById('editVagaData').value;
   const orcado = document.getElementById('editVagaOrcado').value;
   const preenchido = document.getElementById('editVagaPreenchido').value;
+  const presenca = document.getElementById('editVagaPresenca').value;
+  const emAberto = document.getElementById('editVagaEmAberto').value;
   const faltas = document.getElementById('editVagaFaltas').value;
   const obs = document.getElementById('editVagaObs').value.trim();
 
@@ -1763,7 +1789,16 @@ function salvarEdicaoVaga(){
   const idx = lista.findIndex(r => r.id === editandoVagaId);
   if(idx === -1) return;
 
-  lista[idx] = { ...lista[idx], data, orcado: Number(orcado)||0, preenchido: Number(preenchido)||0, faltas: Number(faltas)||0, obs };
+  lista[idx] = {
+    ...lista[idx],
+    data,
+    orcado: Number(orcado)||0,
+    preenchido: Number(preenchido)||0,
+    presenca: presenca === '' ? null : Number(presenca) || 0,
+    emAberto: emAberto === '' ? null : Number(emAberto) || 0,
+    faltas: Number(faltas)||0,
+    obs
+  };
   saveVagasRegistros(lista);
   fecharModalVaga();
   renderVagasTudo();
@@ -1808,7 +1843,8 @@ function renderVagasTudo(){
     totalPreenchido += r.preenchido;
     totalFaltas += (r.faltas || 0);
 
-    const vagasEmAberto = Math.max(r.orcado - r.preenchido, 0);
+    const presenca = (r.presenca === null || r.presenca === undefined) ? '—' : r.presenca;
+    const emAberto = (r.emAberto === null || r.emAberto === undefined) ? '—' : r.emAberto;
     const pct = r.orcado > 0 ? Math.round((r.preenchido / r.orcado) * 100) : 0;
 
     const tr = document.createElement('tr');
@@ -1816,8 +1852,9 @@ function renderVagasTudo(){
       <td>${formatDate(r.data)}</td>
       <td>${r.orcado}</td>
       <td>${r.preenchido}</td>
+      <td>${presenca}</td>
+      <td>${emAberto}</td>
       <td>${r.faltas || 0}</td>
-      <td>${vagasEmAberto}</td>
       <td>${pct}%</td>
       <td>${escapeHtml(r.obs) || '—'}</td>
       <td>
@@ -2451,7 +2488,7 @@ function init(){
   document.getElementById('filtroVagaDataFim').addEventListener('change', renderVagasTudo);
   document.getElementById('fVagaData').addEventListener('change', atualizarVagaPreenchidoAutomatico);
   atualizarVagaPreenchidoAutomatico();
-  ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaFaltas'].forEach(id => {
+  ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaPresenca','fVagaEmAberto','fVagaFaltas'].forEach(id => {
     document.getElementById(id).addEventListener('change', esconderErroFormVaga);
   });
 
