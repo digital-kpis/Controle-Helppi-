@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Controle de Helppis</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -380,7 +383,7 @@
 <!-- LANÇAR VAGAS DO DIA -->
 <div class="panel">
   <h2>Vagas do dia</h2>
-  <div class="hint">Cada lançamento é sempre um registro novo. "Vagas preenchidas" é calculado automaticamente pela quantidade de operadores com lançamento de Helppi na data escolhida.</div>
+  <div class="hint">Cada lançamento é sempre um registro novo. "Presença" é calculado automaticamente pela quantidade de operadores com lançamento de Helppi na data escolhida.</div>
   <div class="row">
     <div class="field">
       <label>Data</label>
@@ -392,11 +395,11 @@
     </div>
     <div class="field">
       <label>Vagas preenchidas</label>
-      <input type="number" id="fVagaPreenchido" min="0" placeholder="0" readonly style="opacity:.75; cursor:not-allowed;">
+      <input type="number" id="fVagaPreenchido" min="0" placeholder="0">
     </div>
     <div class="field">
       <label>Presença</label>
-      <input type="number" id="fVagaPresenca" min="0" placeholder="0">
+      <input type="number" id="fVagaPresenca" min="0" placeholder="0" readonly style="opacity:.75; cursor:not-allowed;">
     </div>
     <div class="field">
       <label>Em aberto</label>
@@ -964,7 +967,7 @@ function mudarAba(nome){
     abaVagas.style.display = 'block';
     btnVagas.classList.add('active');
     renderVagasTudo();
-    atualizarVagaPreenchidoAutomatico();
+    atualizarVagaPresencaAutomatica();
   }else if(nome === 'produtividade'){
     abaProdutividade.style.display = 'block';
     btnProdutividade.classList.add('active');
@@ -1666,14 +1669,14 @@ function esconderErroFormVaga(){
 }
 
 // Sempre cria um lançamento novo (nunca sobrescreve um registro existente).
-function atualizarVagaPreenchidoAutomatico(){
+function atualizarVagaPresencaAutomatica(){
   const data = document.getElementById('fVagaData').value;
-  const campo = document.getElementById('fVagaPreenchido');
+  const campo = document.getElementById('fVagaPresenca');
   if(!data){
     campo.value = '';
     return;
   }
-  // "vagas preenchidas" = quantidade de operadores distintos com lançamento de Helppi nessa data
+  // "presença" = quantidade de operadores distintos com lançamento de Helppi nessa data
   const operadoresUnicos = new Set(
     getRegistros().filter(r => r.data === data).map(r => r.operador)
   );
@@ -1717,11 +1720,11 @@ function addVaga(){
   saveVagasRegistros(lista);
 
   document.getElementById('fVagaOrcado').value = '';
-  document.getElementById('fVagaPresenca').value = '';
+  document.getElementById('fVagaPreenchido').value = '';
   document.getElementById('fVagaEmAberto').value = '';
   document.getElementById('fVagaFaltas').value = '';
   document.getElementById('fVagaObs').value = '';
-  atualizarVagaPreenchidoAutomatico();
+  atualizarVagaPresencaAutomatica();
 
   renderVagasTudo();
   showToast(msg);
@@ -2486,8 +2489,8 @@ function init(){
   document.getElementById('fVagaData').value = todayStr();
   document.getElementById('filtroVagaDataIni').addEventListener('change', renderVagasTudo);
   document.getElementById('filtroVagaDataFim').addEventListener('change', renderVagasTudo);
-  document.getElementById('fVagaData').addEventListener('change', atualizarVagaPreenchidoAutomatico);
-  atualizarVagaPreenchidoAutomatico();
+  document.getElementById('fVagaData').addEventListener('change', atualizarVagaPresencaAutomatica);
+  atualizarVagaPresencaAutomatica();
   ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaPresenca','fVagaEmAberto','fVagaFaltas'].forEach(id => {
     document.getElementById(id).addEventListener('change', esconderErroFormVaga);
   });
