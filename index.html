@@ -286,7 +286,7 @@
 
 <!-- STATUS GRID -->
 <div class="panel">
-  <h2>Situação dos Helppis (01–50)</h2>
+  <h2 id="tituloSituacaoHelppis">Situação dos Helppis (01–50)</h2>
   <div class="row" style="margin-bottom:12px;">
     <div class="field">
       <label>Ver situação na data</label>
@@ -294,6 +294,12 @@
     </div>
     <div class="field" style="flex:0;">
       <button class="secondary" onclick="setGridToday()">Hoje</button>
+    </div>
+    <div class="field" style="flex:0;">
+      <button onclick="adicionarTerminalHelppi()">+ Adicionar Helppi</button>
+    </div>
+    <div class="field" style="flex:0;">
+      <button class="secondary" onclick="removerUltimoTerminalHelppi()">− Remover último</button>
     </div>
   </div>
   <div class="stats">
@@ -548,6 +554,41 @@
     </div>
   </div>
 </div>
+
+<!-- CADASTRAR NOVOS ACESSOS -->
+<div class="panel">
+  <h2>Cadastrar novo acesso</h2>
+  <div class="hint">Cadastre outros logins/sistemas que os operadores precisem acessar (cada um ganha seu próprio QR code).</div>
+  <div class="row" style="margin-top:10px;">
+    <div class="field">
+      <label>Nome / descrição</label>
+      <input type="text" id="fAcessoNome" placeholder="Ex: Portal do colaborador">
+    </div>
+    <div class="field">
+      <label>Link</label>
+      <input type="text" id="fAcessoLink" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="fAcessoUsuario" placeholder="Usuário (opcional)">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="text" id="fAcessoSenha" placeholder="Senha (opcional)">
+    </div>
+    <div class="field" style="flex:0; justify-content:flex-end;">
+      <button onclick="addAcesso()">Salvar acesso</button>
+    </div>
+  </div>
+  <div id="acessoErro" class="form-erro" style="display:none;"></div>
+</div>
+
+<!-- LISTA DE ACESSOS CADASTRADOS -->
+<div class="panel">
+  <h2>Acessos cadastrados</h2>
+  <div id="listaAcessos" style="display:flex; flex-direction:column; gap:14px; margin-top:12px;"></div>
+  <div id="emptyAcessosMsg" class="empty" style="display:none;">Nenhum acesso cadastrado ainda.</div>
+</div>
 </div><!-- fim #abaIfood -->
 
 <!-- BACKUP -->
@@ -705,6 +746,34 @@
   </div>
 </div>
 
+<div id="editAcessoModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalAcesso();">
+  <div class="modal-box">
+    <h3>Editar acesso</h3>
+    <div class="field">
+      <label>Nome / descrição</label>
+      <input type="text" id="editAcessoNome">
+    </div>
+    <div class="field">
+      <label>Link</label>
+      <input type="text" id="editAcessoLink">
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="editAcessoUsuario">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="text" id="editAcessoSenha">
+    </div>
+    <div id="editAcessoErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoAcesso()">Salvar</button>
+      <button class="danger" onclick="excluirDoModalAcesso()">Excluir</button>
+      <button class="secondary" onclick="fecharModalAcesso()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -721,6 +790,8 @@ let _registrosCache = null;
 let _almocoCache = null;
 let _vagasCache = null;
 let _produtividadeCache = null;
+let _acessosCache = null;
+let _totalHelppisCache = null;
 let cloudSyncOk = true;
 
 // Envia a lista inteira (registros ou almoco) para a nuvem. Silencioso em caso
@@ -746,7 +817,7 @@ async function pushToCloud(id, value){
 // se a nuvem já tiver dados; caso contrário, envia o que existir localmente).
 async function carregarDadosNuvem(){
   try{
-    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco', 'vagas', 'produtividade']);
+    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco', 'vagas', 'produtividade', 'acessos', 'totalHelppis']);
     if(error) throw error;
     const map = {};
     (data || []).forEach(row => { map[row.id] = row.value; });
@@ -772,6 +843,20 @@ async function carregarDadosNuvem(){
       await pushToCloud('vagas', getVagasRegistros());
     }
 
+    if(map.acessos !== undefined){
+      _acessosCache = map.acessos || [];
+      localStorage.setItem(ACESSOS_KEY, JSON.stringify(_acessosCache));
+    }else{
+      await pushToCloud('acessos', getAcessos());
+    }
+
+    if(map.totalHelppis !== undefined && Number.isFinite(map.totalHelppis) && map.totalHelppis >= 1){
+      _totalHelppisCache = map.totalHelppis;
+      localStorage.setItem(TOTAL_HELPPIS_KEY, String(_totalHelppisCache));
+    }else{
+      await pushToCloud('totalHelppis', getTotalHelppis());
+    }
+
     if(map.produtividade !== undefined){
       // mescla em vez de sobrescrever: se o usuário importou uma planilha localmente
       // enquanto essa busca na nuvem ainda estava em andamento, isso evita apagar
@@ -789,11 +874,14 @@ async function carregarDadosNuvem(){
       await pushToCloud('produtividade', getProdutividadePedidos());
     }
 
+    atualizarTituloSituacaoHelppis();
+    populateHelppiSelects();
     renderAll();
     renderAlmocoTudo();
     renderFiltroAlmocoColaborador();
     renderVagasTudo();
     renderProdutividade();
+    renderAcessos();
     updateBackupInfo();
     cloudSyncOk = true;
   }catch(err){
@@ -827,6 +915,19 @@ function setupRealtime(){
         localStorage.setItem(VAGAS_KEY, JSON.stringify(_vagasCache));
         renderVagasTudo();
         updateBackupInfo();
+      }else if(row.id === 'acessos'){
+        _acessosCache = row.value || [];
+        localStorage.setItem(ACESSOS_KEY, JSON.stringify(_acessosCache));
+        renderAcessos();
+        updateBackupInfo();
+      }else if(row.id === 'totalHelppis'){
+        if(Number.isFinite(row.value) && row.value >= 1){
+          _totalHelppisCache = row.value;
+          localStorage.setItem(TOTAL_HELPPIS_KEY, String(_totalHelppisCache));
+          atualizarTituloSituacaoHelppis();
+          populateHelppiSelects();
+          renderGrid();
+        }
       }else if(row.id === 'produtividade'){
         // mescla em vez de sobrescrever: um eco da própria gravação (ou uma
         // atualização atrasada/incompleta vinda da nuvem) nunca deve apagar
@@ -975,6 +1076,7 @@ function mudarAba(nome){
   }else if(nome === 'ifood'){
     abaIfood.style.display = 'block';
     btnIfood.classList.add('active');
+    renderAcessos();
   }else{
     abaHelppis.style.display = 'block';
     btnHelppis.classList.add('active');
@@ -982,11 +1084,62 @@ function mudarAba(nome){
 }
 
 // populate helppi selects (01..50)
+// ---- QUANTIDADE DE TERMINAIS HELPPI (expansível além do 50) ----
+function getTotalHelppis(){
+  if(_totalHelppisCache !== null) return _totalHelppisCache;
+  const salvo = parseInt(localStorage.getItem(TOTAL_HELPPIS_KEY), 10);
+  _totalHelppisCache = (Number.isFinite(salvo) && salvo >= 1) ? salvo : 50;
+  return _totalHelppisCache;
+}
+function saveTotalHelppis(n){
+  _totalHelppisCache = n;
+  localStorage.setItem(TOTAL_HELPPIS_KEY, String(n));
+  pushToCloud('totalHelppis', n);
+}
+
+function atualizarTituloSituacaoHelppis(){
+  const total = getTotalHelppis();
+  document.getElementById('tituloSituacaoHelppis').textContent = `Situação dos Helppis (01–${pad2(total)})`;
+}
+
+function adicionarTerminalHelppi(){
+  const novoTotal = getTotalHelppis() + 1;
+  saveTotalHelppis(novoTotal);
+  atualizarTituloSituacaoHelppis();
+  populateHelppiSelects();
+  renderGrid();
+  showToast(`Helppi ${pad2(novoTotal)} adicionado.`);
+}
+
+function removerUltimoTerminalHelppi(){
+  const total = getTotalHelppis();
+  if(total <= 1){
+    showToast('Não é possível remover: já é o único terminal.');
+    return;
+  }
+  const ultimoVal = pad2(total);
+  const emUso = getRegistros().some(r => r.helppi === ultimoVal && r.data === todayStr() && !r.horaSaida);
+  if(emUso){
+    showToast(`Helppi ${ultimoVal} está ocupado agora — não é possível remover.`);
+    return;
+  }
+  pedirConfirmacao(`Remover o Helppi ${ultimoVal} da grade? (o histórico de lançamentos dele não será apagado)`, () => {
+    saveTotalHelppis(total - 1);
+    atualizarTituloSituacaoHelppis();
+    populateHelppiSelects();
+    renderGrid();
+    showToast(`Helppi ${ultimoVal} removido da grade.`);
+  });
+}
+
 function populateHelppiSelects(){
   const fHelppi = document.getElementById('fHelppi');
   const filtroHelppi = document.getElementById('filtroHelppi');
   const editHelppi = document.getElementById('editHelppi');
-  for(let i=1;i<=50;i++){
+  fHelppi.innerHTML = '';
+  filtroHelppi.innerHTML = '<option value="">Todas</option>';
+  editHelppi.innerHTML = '';
+  for(let i=1;i<=getTotalHelppis();i++){
     const val = pad2(i);
     const opt1 = document.createElement('option');
     opt1.value = val; opt1.textContent = 'Helppi ' + val;
@@ -1066,15 +1219,16 @@ function addRegistro(){
 // Após um lançamento, avança automaticamente o campo Helppi para o próximo
 // número que ainda não tem registro na data informada (sem precisar selecionar manualmente).
 function selecionarProximoHelppiDisponivel(dataRef, atual){
-  for(let i = 1; i <= 50; i++){
+  const total = getTotalHelppis();
+  for(let i = 1; i <= total; i++){
     const atualNum = parseInt(atual, 10);
-    const candidato = pad2(((atualNum - 1 + i) % 50) + 1);
+    const candidato = pad2(((atualNum - 1 + i) % total) + 1);
     if(!obterOcupacaoHelppi(candidato, dataRef, null)){
       document.getElementById('fHelppi').value = candidato;
       return;
     }
   }
-  // se não achou nenhum livre (todos os 50 ocupados na data), mantém o valor atual
+  // se não achou nenhum livre (todos os terminais ocupados na data), mantém o valor atual
 }
 
 function selecionarHelppiNoFormulario(val){
@@ -1207,8 +1361,9 @@ function renderGrid(){
   const gridEl = document.getElementById('gridHelppis');
   gridEl.innerHTML = '';
   let ocupadas = 0;
+  const totalHelppis = getTotalHelppis();
 
-  for(let i=1;i<=50;i++){
+  for(let i=1;i<=totalHelppis;i++){
     const val = pad2(i);
     const regBruto = latestPerHelppi[val];
     // se o último lançamento já teve "Saída" marcada, o Helppi volta a ficar livre
@@ -1242,7 +1397,7 @@ function renderGrid(){
   }
 
   document.getElementById('statOcupadas').textContent = ocupadas;
-  document.getElementById('statLivres').textContent = 50 - ocupadas;
+  document.getElementById('statLivres').textContent = totalHelppis - ocupadas;
 }
 
 // Cria os botões de ação rápida "Dobra" e "Saída" dentro da célula ocupada.
@@ -1819,6 +1974,164 @@ function excluirDoModalVaga(){
   });
 }
 
+// ---- ACESSOS (cadastro de logins/sistemas para operadores) ----
+function getAcessos(){
+  if(_acessosCache !== null) return _acessosCache;
+  try{
+    _acessosCache = JSON.parse(localStorage.getItem(ACESSOS_KEY)) || [];
+  }catch(e){ _acessosCache = []; }
+  return _acessosCache;
+}
+function saveAcessos(list){
+  _acessosCache = list;
+  localStorage.setItem(ACESSOS_KEY, JSON.stringify(list));
+  pushToCloud('acessos', list);
+}
+
+function mostrarErroAcesso(msg){
+  const el = document.getElementById('acessoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function esconderErroAcesso(){
+  document.getElementById('acessoErro').style.display = 'none';
+}
+
+function addAcesso(){
+  esconderErroAcesso();
+
+  const nome = document.getElementById('fAcessoNome').value.trim();
+  const link = document.getElementById('fAcessoLink').value.trim();
+  const usuario = document.getElementById('fAcessoUsuario').value.trim();
+  const senha = document.getElementById('fAcessoSenha').value.trim();
+
+  if(!nome || !link){
+    mostrarErroAcesso('Preencha ao menos o nome e o link.');
+    return;
+  }
+
+  const lista = getAcessos();
+  lista.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    nome, link, usuario, senha
+  });
+  saveAcessos(lista);
+
+  document.getElementById('fAcessoNome').value = '';
+  document.getElementById('fAcessoLink').value = '';
+  document.getElementById('fAcessoUsuario').value = '';
+  document.getElementById('fAcessoSenha').value = '';
+
+  renderAcessos();
+  showToast('Acesso cadastrado.');
+}
+
+function renderAcessos(){
+  const lista = getAcessos();
+  const container = document.getElementById('listaAcessos');
+  const emptyMsg = document.getElementById('emptyAcessosMsg');
+
+  container.innerHTML = '';
+  emptyMsg.style.display = lista.length ? 'none' : 'block';
+
+  lista.forEach(a => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;';
+    card.innerHTML = `
+      <div style="background:#fff; padding:8px; border-radius:8px; width:96px; height:96px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <canvas id="acessoQr-${a.id}" width="80" height="80"></canvas>
+      </div>
+      <div style="flex:1; min-width:180px;">
+        <div style="font-size:16px; font-weight:700;">${escapeHtml(a.nome)}</div>
+        <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="font-size:14px; color:var(--accent, #4f8cff); text-decoration:none; word-break:break-all;">${escapeHtml(a.link)}</a>
+        ${a.usuario ? `<div style="font-size:13px; color:var(--muted, #9aa4b2); margin-top:6px;">Usuário: <b style="color:var(--text, #e6e8ec);">${escapeHtml(a.usuario)}</b></div>` : ''}
+        ${a.senha ? `<div style="font-size:13px; color:var(--muted, #9aa4b2);">Senha: <b style="color:var(--text, #e6e8ec);">${escapeHtml(a.senha)}</b></div>` : ''}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicaoAcesso('${a.id}')">Editar</button>
+        <button class="del-btn" onclick="excluirAcesso('${a.id}')">Excluir</button>
+      </div>
+    `;
+    container.appendChild(card);
+
+    if(typeof QRCode !== 'undefined'){
+      const canvas = card.querySelector(`#acessoQr-${a.id}`);
+      QRCode.toCanvas(canvas, a.link, { width: 80, margin: 0 }, err => {
+        if(err) console.error('Falha ao gerar QR do acesso', a.id, err);
+      });
+    }
+  });
+}
+
+function excluirAcesso(id){
+  pedirConfirmacao('Excluir este acesso cadastrado?', () => {
+    const lista = getAcessos().filter(a => a.id !== id);
+    saveAcessos(lista);
+    renderAcessos();
+  });
+}
+
+let editandoAcessoId = null;
+
+function abrirEdicaoAcesso(id){
+  const reg = getAcessos().find(a => a.id === id);
+  if(!reg) return;
+
+  editandoAcessoId = id;
+  document.getElementById('editAcessoNome').value = reg.nome;
+  document.getElementById('editAcessoLink').value = reg.link;
+  document.getElementById('editAcessoUsuario').value = reg.usuario || '';
+  document.getElementById('editAcessoSenha').value = reg.senha || '';
+  document.getElementById('editAcessoErro').style.display = 'none';
+  document.getElementById('editAcessoModal').style.display = 'flex';
+}
+
+function fecharModalAcesso(){
+  editandoAcessoId = null;
+  document.getElementById('editAcessoModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoAcesso(msg){
+  const el = document.getElementById('editAcessoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoAcesso(){
+  if(!editandoAcessoId) return;
+
+  const nome = document.getElementById('editAcessoNome').value.trim();
+  const link = document.getElementById('editAcessoLink').value.trim();
+  const usuario = document.getElementById('editAcessoUsuario').value.trim();
+  const senha = document.getElementById('editAcessoSenha').value.trim();
+
+  if(!nome || !link){
+    mostrarErroEdicaoAcesso('Preencha ao menos o nome e o link.');
+    return;
+  }
+
+  const lista = getAcessos();
+  const idx = lista.findIndex(a => a.id === editandoAcessoId);
+  if(idx === -1) return;
+
+  lista[idx] = { ...lista[idx], nome, link, usuario, senha };
+  saveAcessos(lista);
+  fecharModalAcesso();
+  renderAcessos();
+}
+
+function excluirDoModalAcesso(){
+  if(!editandoAcessoId) return;
+  const idParaExcluir = editandoAcessoId;
+
+  pedirConfirmacao('Excluir este acesso cadastrado?', () => {
+    const lista = getAcessos().filter(a => a.id !== idParaExcluir);
+    saveAcessos(lista);
+    fecharModalAcesso();
+    renderAcessos();
+  });
+}
+
 function limparFiltroVagas(){
   document.getElementById('filtroVagaDataIni').value = '';
   document.getElementById('filtroVagaDataFim').value = '';
@@ -1883,7 +2196,9 @@ function exportBackup(automatico){
     registros: getRegistros(),
     almocoRegistros: getAlmocoRegistros(),
     vagasRegistros: getVagasRegistros(),
-    produtividadePedidos: getProdutividadePedidos()
+    produtividadePedidos: getProdutividadePedidos(),
+    acessos: getAcessos(),
+    totalHelppis: getTotalHelppis()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1968,7 +2283,9 @@ async function escreverBackupNoArquivoEscolhido(){
       registros: getRegistros(),
       almocoRegistros: getAlmocoRegistros(),
       vagasRegistros: getVagasRegistros(),
-      produtividadePedidos: getProdutividadePedidos()
+      produtividadePedidos: getProdutividadePedidos(),
+      acessos: getAcessos(),
+      totalHelppis: getTotalHelppis()
     };
     const writable = await autoBackupFileHandle.createWritable();
     await writable.write(JSON.stringify(dados, null, 2));
@@ -2061,10 +2378,13 @@ async function importBackup(event){
   let almocoCombinados = [];
   let vagasCombinados = [];
   let produtividadeCombinados = [];
+  let acessosCombinados = [];
+  let maiorTotalHelppis = null;
   const idsVistos = new Set();
   const almocoIdsVistos = new Set();
   const vagasIdsVistos = new Set();
   const produtividadeIdsVistos = new Set();
+  const acessosIdsVistos = new Set();
   const arquivosComErro = [];
 
   for(const file of files){
@@ -2075,6 +2395,13 @@ async function importBackup(event){
       const almocoRegistros = Array.isArray(parsed) ? [] : (parsed.almocoRegistros || []);
       const vagasRegistros = Array.isArray(parsed) ? [] : (parsed.vagasRegistros || []);
       const produtividadePedidos = Array.isArray(parsed) ? [] : (parsed.produtividadePedidos || []);
+      const acessos = Array.isArray(parsed) ? [] : (parsed.acessos || []);
+      const totalHelppisImportado = Array.isArray(parsed) ? null : parsed.totalHelppis;
+      if(Number.isFinite(totalHelppisImportado) && totalHelppisImportado >= 1){
+        if(maiorTotalHelppis === null || totalHelppisImportado > maiorTotalHelppis){
+          maiorTotalHelppis = totalHelppisImportado;
+        }
+      }
 
       if(!Array.isArray(registros)) throw new Error('formato inválido');
 
@@ -2102,12 +2429,18 @@ async function importBackup(event){
           produtividadeCombinados.push(p);
         }
       });
+      acessos.forEach(a => {
+        if(!acessosIdsVistos.has(a.id)){
+          acessosIdsVistos.add(a.id);
+          acessosCombinados.push(a);
+        }
+      });
     }catch(err){
       arquivosComErro.push(file.name);
     }
   }
 
-  const totalItens = registrosCombinados.length + almocoCombinados.length + vagasCombinados.length + produtividadeCombinados.length;
+  const totalItens = registrosCombinados.length + almocoCombinados.length + vagasCombinados.length + produtividadeCombinados.length + acessosCombinados.length;
 
   if(!totalItens){
     showToast('Nenhum dado válido encontrado nos arquivo(s) selecionado(s).');
@@ -2116,7 +2449,7 @@ async function importBackup(event){
   }
 
   pedirConfirmacao(
-    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi, ${almocoCombinados.length} lançamento(s) de almoço, ${vagasCombinados.length} registro(s) de vagas e ${produtividadeCombinados.length} pedido(s) de produtividade, de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
+    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi, ${almocoCombinados.length} lançamento(s) de almoço, ${vagasCombinados.length} registro(s) de vagas, ${produtividadeCombinados.length} pedido(s) de produtividade e ${acessosCombinados.length} acesso(s) cadastrado(s), de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
     'Confirmar = Mesclar com os dados atuais. Para SUBSTITUIR tudo em vez de mesclar, clique em Cancelar e use "Apagar todos os dados" antes de importar.',
     () => {
       const registrosAtuais = getRegistros();
@@ -2139,10 +2472,22 @@ async function importBackup(event){
       const novosProdutividade = produtividadeCombinados.filter(p => !idsProdutividadeAtuais.has(p.pedidoId));
       saveProdutividadePedidos(produtividadeAtuais.concat(novosProdutividade));
 
+      const acessosAtuais = getAcessos();
+      const idsAcessosAtuais = new Set(acessosAtuais.map(a => a.id));
+      const novosAcessos = acessosCombinados.filter(a => !idsAcessosAtuais.has(a.id));
+      saveAcessos(acessosAtuais.concat(novosAcessos));
+
+      if(maiorTotalHelppis !== null && maiorTotalHelppis > getTotalHelppis()){
+        saveTotalHelppis(maiorTotalHelppis);
+        atualizarTituloSituacaoHelppis();
+        populateHelppiSelects();
+      }
+
       renderAll();
       renderAlmocoTudo();
       renderVagasTudo();
       renderProdutividade();
+      renderAcessos();
 
       let msg = `Importação concluída: ${totalItens} item(ns) processado(s).`;
       if(arquivosComErro.length){
@@ -2176,13 +2521,16 @@ function updateBackupInfo(){
   const totalAlmoco = getAlmocoRegistros().length;
   const totalVagas = getVagasRegistros().length;
   const totalProdutividade = getProdutividadePedidos().length;
+  const totalAcessos = getAcessos().length;
   const infoEl = document.getElementById('backupInfo');
   const lastStr = last ? new Date(last).toLocaleString('pt-BR') : 'nenhum backup gerado ainda';
-  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Registros de vagas: ${totalVagas} · Pedidos de produtividade: ${totalProdutividade} · Último backup: ${lastStr}`;
+  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Registros de vagas: ${totalVagas} · Pedidos de produtividade: ${totalProdutividade} · Acessos cadastrados: ${totalAcessos} · Último backup: ${lastStr}`;
 }
 
 // ---- PRODUTIVIDADE (cruzamento das planilhas de pedidos com o histórico de Helppis) ----
 const PRODUTIVIDADE_KEY = 'helppi_produtividade_pedidos_v1';
+const ACESSOS_KEY = 'helppi_acessos_cadastrados_v1';
+const TOTAL_HELPPIS_KEY = 'helppi_total_terminais_v1';
 
 function getProdutividadePedidos(){
   if(_produtividadeCache !== null) return _produtividadeCache;
@@ -2467,6 +2815,7 @@ function renderIfoodQr(){
 
 // ---- INIT ----
 function init(){
+  atualizarTituloSituacaoHelppis();
   populateHelppiSelects();
   document.getElementById('fData').value = todayStr();
   atualizarRelogio();
@@ -2523,6 +2872,8 @@ function init(){
         fecharModalAlmoco();
       }else if(document.getElementById('editVagaModal').style.display !== 'none'){
         fecharModalVaga();
+      }else if(document.getElementById('editAcessoModal').style.display !== 'none'){
+        fecharModalAcesso();
       }
     }
   });
@@ -2535,6 +2886,7 @@ function init(){
 
   renderAll();
   renderIfoodQr();
+  renderAcessos();
   carregarDadosNuvem();
   setupRealtime();
 }
