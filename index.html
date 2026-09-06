@@ -7,7 +7,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Controle de Helppis</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <style>
@@ -782,10 +783,20 @@ const LAST_BACKUP_KEY = 'helppi_last_backup';
 const ALMOCO_KEY = 'helppi_almoco_registros';
 const VAGAS_KEY = 'helppi_vagas_registros';
 
-// ---- SUPABASE (sincronização em tempo real entre dispositivos) ----
-const SUPABASE_URL = 'https://tshotmnnpsqcjmqaidlu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzaG90bW5ucHNxY2ptcWFpZGx1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2NDkzMTksImV4cCI6MjA5OTIyNTMxOX0.ovbE4ylar6LcQvOVNVHlgL9L83sa0_PS_dwSicli_8E';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ---- FIREBASE (banco compartilhado do PAINEL: escala-dinamica) ----
+// sincronização em tempo real entre dispositivos
+const FB_CFG = {
+  apiKey: "AIzaSyD2qYaUrjyFoJgfNLRTBg-b2t9Yr9GSB3A",
+  authDomain: "escala-dinamica.firebaseapp.com",
+  databaseURL: "https://escala-dinamica-default-rtdb.firebaseio.com",
+  projectId: "escala-dinamica",
+  storageBucket: "escala-dinamica.firebasestorage.app",
+  messagingSenderId: "896362898729",
+  appId: "1:896362898729:web:443ef1f568fc709bf3c338"
+};
+const FB_PATH = 'controle_helppi';
+firebase.initializeApp(FB_CFG);
+const db = firebase.database();
 let _registrosCache = null;
 let _almocoCache = null;
 let _vagasCache = null;
@@ -798,8 +809,7 @@ let cloudSyncOk = true;
 // de sucesso; avisa uma única vez se cair offline, e uma única vez ao voltar.
 async function pushToCloud(id, value){
   try{
-    const { error } = await sb.from('kv_store').upsert({ id, value, updated_at: new Date().toISOString() });
-    if(error) throw error;
+    await db.ref(FB_PATH + '/' + id).set({ value, updated_at: new Date().toISOString() });
     if(!cloudSyncOk){
       cloudSyncOk = true;
       showToast('✅ Conexão com a nuvem restabelecida. Dados sincronizados.');
@@ -817,10 +827,10 @@ async function pushToCloud(id, value){
 // se a nuvem já tiver dados; caso contrário, envia o que existir localmente).
 async function carregarDadosNuvem(){
   try{
-    const { data, error } = await sb.from('kv_store').select('id, value').in('id', ['registros', 'almoco', 'vagas', 'produtividade', 'acessos', 'totalHelppis']);
-    if(error) throw error;
+    const snap = await db.ref(FB_PATH).once('value');
+    const raw = snap.val() || {};
     const map = {};
-    (data || []).forEach(row => { map[row.id] = row.value; });
+    Object.keys(raw).forEach(k => { map[k] = raw[k] ? raw[k].value : undefined; });
 
     if(map.registros !== undefined){
       _registrosCache = map.registros || [];
@@ -893,9 +903,12 @@ async function carregarDadosNuvem(){
 // Mantém todos os dispositivos em sincronia: quando outra pessoa salva algo,
 // esta aba recebe o dado atualizado e re-renderiza automaticamente.
 function setupRealtime(){
-  sb.channel('kv_store_changes')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store' }, payload => {
-      const row = payload.new && payload.new.id ? payload.new : null;
+  db.ref(FB_PATH).on('child_changed', snap => {
+    handleRealtimeRow({ id: snap.key, value: snap.val() ? snap.val().value : undefined });
+  });
+}
+
+function handleRealtimeRow(row){
       if(!row) return;
 
       if(row.id === 'registros'){
@@ -943,8 +956,6 @@ function setupRealtime(){
         }
         updateBackupInfo();
       }
-    })
-    .subscribe();
 }
 
 function todayStr(){
