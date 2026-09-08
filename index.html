@@ -285,6 +285,27 @@
   <div id="formErro" class="form-erro" style="display:none;"></div>
 </div>
 
+<!-- MARCAR PRESENÇA SEM USO DE HELPPI -->
+<div class="panel">
+  <h2>Marcar presença (sem uso de Helppi)</h2>
+  <div class="sub" style="margin-bottom:14px;">Pra operador que está na loja mas não vai usar nenhum Helppi. Lista própria desta tela.</div>
+  <div class="row" style="margin-bottom:14px;">
+    <div class="field" style="flex:2;">
+      <label>Adicionar operador à lista</label>
+      <input type="text" id="novoOperadorPresencaNome" placeholder="Nome completo">
+    </div>
+    <div class="field" style="flex:0;">
+      <label>&nbsp;</label>
+      <button onclick="adicionarOperadorPresenca()">+ Adicionar</button>
+    </div>
+    <div class="field">
+      <label>Marcar presença no dia</label>
+      <input type="date" id="presencaLojaData">
+    </div>
+  </div>
+  <div id="listaPresencaRapido" class="grid"></div>
+</div>
+
 <!-- STATUS GRID -->
 <div class="panel">
   <h2 id="tituloSituacaoHelppis">Situação dos Helppis (01–50)</h2>
@@ -781,6 +802,7 @@
 const STORAGE_KEY = 'helppi_registros';
 const LAST_BACKUP_KEY = 'helppi_last_backup';
 const ALMOCO_KEY = 'helppi_almoco_registros';
+const PRESENCA_LOJA_KEY = 'helppi_presenca_loja';
 const VAGAS_KEY = 'helppi_vagas_registros';
 
 // ---- FIREBASE (banco compartilhado do PAINEL: escala-dinamica) ----
@@ -799,6 +821,7 @@ firebase.initializeApp(FB_CFG);
 const db = firebase.database();
 let _registrosCache = null;
 let _almocoCache = null;
+let _presencaLojaCache = null;
 let _vagasCache = null;
 let _produtividadeCache = null;
 let _acessosCache = null;
@@ -846,6 +869,15 @@ async function carregarDadosNuvem(){
       await pushToCloud('almoco', getAlmocoRegistros());
     }
 
+    if(map.presencaLoja !== undefined){
+      _presencaLojaCache = map.presencaLoja || { operadores: [], marcacoes: [] };
+      if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+      if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+      localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(_presencaLojaCache));
+    }else{
+      await pushToCloud('presencaLoja', getPresencaLoja());
+    }
+
     if(map.vagas !== undefined){
       _vagasCache = map.vagas || [];
       localStorage.setItem(VAGAS_KEY, JSON.stringify(_vagasCache));
@@ -889,6 +921,7 @@ async function carregarDadosNuvem(){
     renderAll();
     renderAlmocoTudo();
     renderFiltroAlmocoColaborador();
+    renderListaPresencaRapido();
     renderVagasTudo();
     renderProdutividade();
     renderAcessos();
@@ -922,6 +955,14 @@ function handleRealtimeRow(row){
         localStorage.setItem(ALMOCO_KEY, JSON.stringify(_almocoCache));
         renderAlmocoTudo();
         renderFiltroAlmocoColaborador();
+        updateBackupInfo();
+      }else if(row.id === 'presencaLoja'){
+        _presencaLojaCache = row.value || { operadores: [], marcacoes: [] };
+        if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+        if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+        localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(_presencaLojaCache));
+        renderListaPresencaRapido();
+        renderListaAlmocoRapido();
         updateBackupInfo();
       }else if(row.id === 'vagas'){
         _vagasCache = row.value || [];
@@ -1031,6 +1072,130 @@ function saveAlmocoRegistros(list){
   _almocoCache = list;
   localStorage.setItem(ALMOCO_KEY, JSON.stringify(list));
   pushToCloud('almoco', list);
+}
+
+// ---- PRESENÇA NA LOJA (sem uso de Helppi) ----
+// Lista própria desta tela: { operadores: [{id,nome}], marcacoes: [{id,operadorId,data,hora}] }
+function getPresencaLoja(){
+  if(_presencaLojaCache !== null) return _presencaLojaCache;
+  try{
+    _presencaLojaCache = JSON.parse(localStorage.getItem(PRESENCA_LOJA_KEY)) || { operadores: [], marcacoes: [] };
+  }catch(e){ _presencaLojaCache = { operadores: [], marcacoes: [] }; }
+  if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+  if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+  return _presencaLojaCache;
+}
+function savePresencaLoja(dados){
+  _presencaLojaCache = dados;
+  localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(dados));
+  pushToCloud('presencaLoja', dados);
+}
+
+function adicionarOperadorPresenca(){
+  const input = document.getElementById('novoOperadorPresencaNome');
+  const nome = input.value.trim();
+  if(!nome){
+    showToast('Informe o nome do operador.');
+    return;
+  }
+  const dados = getPresencaLoja();
+  const jaExiste = dados.operadores.some(o => o.nome.trim().toLowerCase() === nome.toLowerCase());
+  if(jaExiste){
+    showToast('Esse operador já está na lista.');
+    input.value = '';
+    return;
+  }
+  dados.operadores.push({ id: 'op' + Date.now(), nome });
+  savePresencaLoja(dados);
+  input.value = '';
+  renderListaPresencaRapido();
+  showToast(`"${nome}" adicionado à lista.`);
+}
+
+function statusPresencaNoDia(operadorId, data){
+  const dados = getPresencaLoja();
+  return dados.marcacoes.find(m => m.operadorId === operadorId && m.data === data) || null;
+}
+
+function marcarPresencaRapida(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const existente = statusPresencaNoDia(operadorId, data);
+  if(existente){
+    showToast(`Presença de "${nome}" já estava marcada em ${formatDate(data)}.`);
+    return;
+  }
+  dados.marcacoes.push({
+    id: 'pm' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    operadorId, data, hora: nowTimeStr()
+  });
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  showToast(`Presença marcada: ${nome} em ${formatDate(data)}.`);
+}
+
+function desmarcarPresenca(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  dados.marcacoes = dados.marcacoes.filter(m => !(m.operadorId === operadorId && m.data === data));
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  showToast(`Presença de "${nome}" desmarcada em ${formatDate(data)}.`);
+}
+
+function removerOperadorPresenca(operadorId, nome){
+  pedirConfirmacao(`Remover "${nome}" da lista de operadores? (não apaga presenças já marcadas)`, () => {
+    const dados = getPresencaLoja();
+    dados.operadores = dados.operadores.filter(o => o.id !== operadorId);
+    savePresencaLoja(dados);
+    renderListaPresencaRapido();
+  });
+}
+
+function renderListaPresencaRapido(){
+  const dataSel = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const container = document.getElementById('listaPresencaRapido');
+  container.innerHTML = '';
+
+  if(!dados.operadores.length){
+    container.innerHTML = '<div class="hint">Nenhum operador adicionado ainda. Use o campo acima.</div>';
+    return;
+  }
+
+  const operadoresOrdenados = [...dados.operadores].sort((a,b) => a.nome.localeCompare(b.nome, 'pt'));
+
+  operadoresOrdenados.forEach(op => {
+    const marcacao = statusPresencaNoDia(op.id, dataSel);
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (marcacao ? 'almoco-feito' : 'livre');
+    cell.innerHTML = `
+      <div class="num almoco-quick-nome">${escapeHtml(op.nome)}</div>
+      <div class="op almoco-quick-status">${marcacao ? '✅ Presente às ' + marcacao.hora : 'Ainda não marcado'}</div>
+    `;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'helppi-quick-actions';
+
+    const btn = document.createElement('button');
+    btn.className = 'mini-btn' + (marcacao ? ' saida' : '');
+    btn.textContent = marcacao ? 'Desmarcar' : 'Marcar presença';
+    btn.onclick = () => marcacao ? desmarcarPresenca(op.id, op.nome) : marcarPresencaRapida(op.id, op.nome);
+    wrapper.appendChild(btn);
+
+    const btnRemover = document.createElement('button');
+    btnRemover.className = 'mini-btn';
+    btnRemover.style.opacity = '0.6';
+    btnRemover.textContent = '✕';
+    btnRemover.title = 'Remover operador da lista';
+    btnRemover.onclick = () => removerOperadorPresenca(op.id, op.nome);
+    wrapper.appendChild(btnRemover);
+
+    cell.appendChild(wrapper);
+    container.appendChild(cell);
+  });
 }
 
 // ---- VAGAS ----
@@ -1566,12 +1731,24 @@ function statusAlmocoHoje(nome){
 // lançamento de Helppi na data de hoje (só quem está trabalhando hoje).
 function obterOperadoresDeHoje(){
   const hoje = todayStr();
-  const nomes = [...new Set(
-    getRegistros()
-      .filter(r => r.data === hoje)
-      .map(r => (r.operador || '').trim())
-      .filter(Boolean)
-  )];
+
+  const nomesHelppi = getRegistros()
+    .filter(r => r.data === hoje)
+    .map(r => (r.operador || '').trim())
+    .filter(Boolean);
+
+  // colaboradores marcados como presentes hoje (sem ter usado nenhum Helppi)
+  // entram na mesma lista, valendo as mesmas regras: almoço, entrada/saída etc.
+  const dadosPresenca = getPresencaLoja();
+  const idsMarcadosHoje = new Set(
+    dadosPresenca.marcacoes.filter(m => m.data === hoje).map(m => m.operadorId)
+  );
+  const nomesPresenca = dadosPresenca.operadores
+    .filter(op => idsMarcadosHoje.has(op.id))
+    .map(op => (op.nome || '').trim())
+    .filter(Boolean);
+
+  const nomes = [...new Set([...nomesHelppi, ...nomesPresenca])];
   return nomes.sort((a,b) => a.localeCompare(b, 'pt-BR'));
 }
 
@@ -2833,6 +3010,10 @@ function init(){
   setInterval(atualizarRelogio, 1000);
   document.getElementById('gridData').value = todayStr();
 
+  document.getElementById('presencaLojaData').value = todayStr();
+  document.getElementById('presencaLojaData').addEventListener('change', renderListaPresencaRapido);
+  renderListaPresencaRapido();
+
   document.getElementById('gridData').addEventListener('change', renderGrid);
   document.getElementById('filtroData').addEventListener('change', renderTable);
   document.getElementById('filtroHelppi').addEventListener('change', renderTable);
@@ -2871,6 +3052,10 @@ function init(){
     document.getElementById(id).addEventListener('keydown', e => {
       if(e.key === 'Enter') addRegistro();
     });
+  });
+
+  document.getElementById('novoOperadorPresencaNome').addEventListener('keydown', e => {
+    if(e.key === 'Enter') adicionarOperadorPresenca();
   });
 
   document.addEventListener('keydown', e => {
