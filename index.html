@@ -127,6 +127,11 @@
     border-color:var(--red);
   }
   .mini-btn:hover{filter:brightness(1.15);}
+  .dobra-badge{
+    display:inline-block; background:rgba(240,196,72,.18); color:var(--yellow);
+    border:1px solid rgba(240,196,72,.4); border-radius:20px; font-size:.66rem;
+    font-weight:700; padding:1px 7px; margin-left:5px; white-space:nowrap; vertical-align:middle;
+  }
   table{width:100%;border-collapse:collapse;font-size:.85rem;}
   th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
   th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;}
@@ -245,7 +250,7 @@
 <div class="sub">Acompanhamento dos Helppis 01 a 50 · operador em uso · histórico por data</div>
 
 <div class="tabs">
-  <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">🗂 Helppis</button>
+  <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">👤 Operadores</button>
   <button class="tab-btn" id="tabBtnAlmoco" onclick="mudarAba('almoco')">🍽 Horário de Almoço</button>
   <button class="tab-btn" id="tabBtnVagas" onclick="mudarAba('vagas')">📊 Vagas</button>
   <button class="tab-btn" id="tabBtnProdutividade" onclick="mudarAba('produtividade')">📈 Produtividade</button>
@@ -254,41 +259,10 @@
 
 <div id="abaHelppis" class="aba">
 
-<!-- FORM -->
+<!-- CADASTRO DE OPERADORES -->
 <div class="panel">
-  <h2>Registrar uso</h2>
-  <div class="row">
-    <div class="field">
-      <label>Helppi</label>
-      <select id="fHelppi"></select>
-    </div>
-    <div class="field" style="flex:2;">
-      <label>Operador</label>
-      <input type="text" id="fOperador" placeholder="Nome do operador">
-    </div>
-    <div class="field">
-      <label>Data</label>
-      <input type="date" id="fData">
-    </div>
-    <div class="field">
-      <label>Hora (automático)</label>
-      <input type="time" id="fHora" readonly>
-    </div>
-    <div class="field" style="flex:2;">
-      <label>Observação (opcional)</label>
-      <input type="text" id="fObs" placeholder="Ex: turno manhã">
-    </div>
-    <div class="field" style="flex:0;">
-      <button onclick="addRegistro()">Registrar</button>
-    </div>
-  </div>
-  <div id="formErro" class="form-erro" style="display:none;"></div>
-</div>
-
-<!-- MARCAR PRESENÇA SEM USO DE HELPPI -->
-<div class="panel">
-  <h2>Marcar presença (sem uso de Helppi)</h2>
-  <div class="sub" style="margin-bottom:14px;">Pra operador que está na loja mas não vai usar nenhum Helppi. Lista própria desta tela.</div>
+  <h2>Cadastro de operadores</h2>
+  <div class="sub" style="margin-bottom:14px;">Lista fixa de operadores da loja, com presença por dia.</div>
   <div class="row" style="margin-bottom:14px;">
     <div class="field" style="flex:2;">
       <label>Adicionar operador à lista</label>
@@ -304,62 +278,6 @@
     </div>
   </div>
   <div id="listaPresencaRapido" class="grid"></div>
-</div>
-
-<!-- STATUS GRID -->
-<div class="panel">
-  <h2 id="tituloSituacaoHelppis">Situação dos Helppis (01–50)</h2>
-  <div class="row" style="margin-bottom:12px;">
-    <div class="field">
-      <label>Ver situação na data</label>
-      <input type="date" id="gridData">
-    </div>
-    <div class="field" style="flex:0;">
-      <button class="secondary" onclick="setGridToday()">Hoje</button>
-    </div>
-    <div class="field" style="flex:0;">
-      <button onclick="adicionarTerminalHelppi()">+ Adicionar Helppi</button>
-    </div>
-    <div class="field" style="flex:0;">
-      <button class="secondary" onclick="removerUltimoTerminalHelppi()">− Remover último</button>
-    </div>
-  </div>
-  <div class="stats">
-    <div class="stat"><b id="statOcupadas">0</b>ocupadas</div>
-    <div class="stat"><b id="statLivres">0</b>livres</div>
-  </div>
-  <div class="grid" id="gridHelppis"></div>
-</div>
-
-<!-- HISTORY -->
-<div class="panel">
-  <h2>Histórico de registros</h2>
-  <div class="toolbar">
-    <div class="field">
-      <label>Filtrar por data</label>
-      <input type="date" id="filtroData">
-    </div>
-    <div class="field">
-      <label>Filtrar por helppi</label>
-      <select id="filtroHelppi"><option value="">Todas</option></select>
-    </div>
-    <div class="field">
-      <label>Filtrar por operador</label>
-      <input type="text" id="filtroOperador" placeholder="Nome...">
-    </div>
-    <div class="field" style="flex:0;justify-content:flex-end;">
-      <button class="secondary" onclick="limparFiltro()">Limpar filtro</button>
-    </div>
-  </div>
-  <div style="overflow-x:auto;">
-    <table>
-      <thead>
-        <tr><th>Helppi</th><th>Operador</th><th>Data</th><th>Hora</th><th>Saída</th><th>Dobra</th><th>Observação</th><th></th></tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-  <div id="emptyMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
 </div>
 
 </div><!-- fim #abaHelppis -->
@@ -639,49 +557,6 @@
   </div>
 </div>
 
-<!-- MODAL EDIÇÃO -->
-<div id="editModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModal();">
-  <div class="modal-box">
-    <h3 id="editHelppiLabel">Editar lançamento</h3>
-    <div class="field">
-      <label>Helppi</label>
-      <select id="editHelppi"></select>
-    </div>
-    <div class="field">
-      <label>Operador</label>
-      <input type="text" id="editOperador">
-    </div>
-    <div class="field">
-      <label>Data</label>
-      <input type="date" id="editData">
-    </div>
-    <div class="field">
-      <label>Hora</label>
-      <input type="time" id="editHora">
-    </div>
-    <div class="field">
-      <label>Observação</label>
-      <input type="text" id="editObs">
-    </div>
-    <div class="field">
-      <label>Hora de saída (deixe em branco se ainda está em uso)</label>
-      <input type="time" id="editHoraSaida">
-    </div>
-    <div class="field">
-      <label class="switch-label" style="cursor:pointer;">
-        <input type="checkbox" id="editDobra">
-        Marcar como dobra
-      </label>
-    </div>
-    <div id="editErro" class="form-erro" style="display:none;"></div>
-    <div class="row" style="margin-top:14px;">
-      <button onclick="salvarEdicao()">Salvar</button>
-      <button class="danger" onclick="excluirEdicao()">Excluir</button>
-      <button class="secondary" onclick="fecharModal()">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <!-- MODAL CONFIRMAÇÃO -->
 <div id="confirmModal" class="modal-overlay confirm-overlay" style="display:none;" onclick="if(event.target===this) fecharConfirmModal();">
   <div class="modal-box">
@@ -916,8 +791,6 @@ async function carregarDadosNuvem(){
       await pushToCloud('produtividade', getProdutividadePedidos());
     }
 
-    atualizarTituloSituacaoHelppis();
-    populateHelppiSelects();
     renderAll();
     renderAlmocoTudo();
     renderFiltroAlmocoColaborador();
@@ -978,9 +851,6 @@ function handleRealtimeRow(row){
         if(Number.isFinite(row.value) && row.value >= 1){
           _totalHelppisCache = row.value;
           localStorage.setItem(TOTAL_HELPPIS_KEY, String(_totalHelppisCache));
-          atualizarTituloSituacaoHelppis();
-          populateHelppiSelects();
-          renderGrid();
         }
       }else if(row.id === 'produtividade'){
         // mescla em vez de sobrescrever: um eco da própria gravação (ou uma
@@ -1145,6 +1015,41 @@ function desmarcarPresenca(operadorId, nome){
   showToast(`Presença de "${nome}" desmarcada em ${formatDate(data)}.`);
 }
 
+function marcarSaidaOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  dados.marcacoes[idx].horaSaida = nowTimeStr();
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  showToast(`Saída registrada: ${nome} às ${dados.marcacoes[idx].horaSaida}.`);
+}
+
+function desfazerSaidaOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  delete dados.marcacoes[idx].horaSaida;
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  showToast(`Saída desfeita: ${nome} está presente novamente.`);
+}
+
+function toggleDobraOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  dados.marcacoes[idx].dobra = !dados.marcacoes[idx].dobra;
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  showToast(dados.marcacoes[idx].dobra
+    ? `Dobra marcada: ${nome}.`
+    : `Marcação de dobra removida: ${nome}.`);
+}
+
 function removerOperadorPresenca(operadorId, nome){
   pedirConfirmacao(`Remover "${nome}" da lista de operadores? (não apaga presenças já marcadas)`, () => {
     const dados = getPresencaLoja();
@@ -1171,19 +1076,47 @@ function renderListaPresencaRapido(){
     const marcacao = statusPresencaNoDia(op.id, dataSel);
     const cell = document.createElement('div');
     cell.className = 'cell ' + (marcacao ? 'almoco-feito' : 'livre');
+
+    let statusTxt = 'Ainda não marcado';
+    if(marcacao){
+      statusTxt = '✅ Presente às ' + marcacao.hora;
+      if(marcacao.horaSaida) statusTxt += ' · Saída às ' + marcacao.horaSaida;
+    }
+
     cell.innerHTML = `
-      <div class="num almoco-quick-nome">${escapeHtml(op.nome)}</div>
-      <div class="op almoco-quick-status">${marcacao ? '✅ Presente às ' + marcacao.hora : 'Ainda não marcado'}</div>
+      <div class="num almoco-quick-nome">${escapeHtml(op.nome)} ${marcacao && marcacao.dobra ? '<span class="dobra-badge">🔁 Dobra</span>' : ''}</div>
+      <div class="op almoco-quick-status">${statusTxt}</div>
     `;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'helppi-quick-actions';
 
-    const btn = document.createElement('button');
-    btn.className = 'mini-btn' + (marcacao ? ' saida' : '');
-    btn.textContent = marcacao ? 'Desmarcar' : 'Marcar presença';
-    btn.onclick = () => marcacao ? desmarcarPresenca(op.id, op.nome) : marcarPresencaRapida(op.id, op.nome);
-    wrapper.appendChild(btn);
+    if(!marcacao){
+      const btn = document.createElement('button');
+      btn.className = 'mini-btn';
+      btn.textContent = 'Marcar presença';
+      btn.onclick = () => marcarPresencaRapida(op.id, op.nome);
+      wrapper.appendChild(btn);
+    }else{
+      const btnDobra = document.createElement('button');
+      btnDobra.className = 'mini-btn' + (marcacao.dobra ? ' active' : '');
+      btnDobra.textContent = marcacao.dobra ? '🔁 Dobra' : 'Dobra';
+      btnDobra.onclick = () => toggleDobraOperador(op.id, op.nome);
+      wrapper.appendChild(btnDobra);
+
+      const btnSaida = document.createElement('button');
+      btnSaida.className = 'mini-btn' + (marcacao.horaSaida ? '' : ' saida');
+      btnSaida.textContent = marcacao.horaSaida ? 'Desfazer saída' : 'Saída';
+      btnSaida.onclick = () => marcacao.horaSaida ? desfazerSaidaOperador(op.id, op.nome) : marcarSaidaOperador(op.id, op.nome);
+      wrapper.appendChild(btnSaida);
+
+      const btnDesmarcar = document.createElement('button');
+      btnDesmarcar.className = 'mini-btn';
+      btnDesmarcar.style.opacity = '0.7';
+      btnDesmarcar.textContent = 'Desmarcar';
+      btnDesmarcar.onclick = () => desmarcarPresenca(op.id, op.nome);
+      wrapper.appendChild(btnDesmarcar);
+    }
 
     const btnRemover = document.createElement('button');
     btnRemover.className = 'mini-btn';
@@ -1273,408 +1206,6 @@ function saveTotalHelppis(n){
   pushToCloud('totalHelppis', n);
 }
 
-function atualizarTituloSituacaoHelppis(){
-  const total = getTotalHelppis();
-  document.getElementById('tituloSituacaoHelppis').textContent = `Situação dos Helppis (01–${pad2(total)})`;
-}
-
-function adicionarTerminalHelppi(){
-  const novoTotal = getTotalHelppis() + 1;
-  saveTotalHelppis(novoTotal);
-  atualizarTituloSituacaoHelppis();
-  populateHelppiSelects();
-  renderGrid();
-  showToast(`Helppi ${pad2(novoTotal)} adicionado.`);
-}
-
-function removerUltimoTerminalHelppi(){
-  const total = getTotalHelppis();
-  if(total <= 1){
-    showToast('Não é possível remover: já é o único terminal.');
-    return;
-  }
-  const ultimoVal = pad2(total);
-  const emUso = getRegistros().some(r => r.helppi === ultimoVal && r.data === todayStr() && !r.horaSaida);
-  if(emUso){
-    showToast(`Helppi ${ultimoVal} está ocupado agora — não é possível remover.`);
-    return;
-  }
-  pedirConfirmacao(`Remover o Helppi ${ultimoVal} da grade? (o histórico de lançamentos dele não será apagado)`, () => {
-    saveTotalHelppis(total - 1);
-    atualizarTituloSituacaoHelppis();
-    populateHelppiSelects();
-    renderGrid();
-    showToast(`Helppi ${ultimoVal} removido da grade.`);
-  });
-}
-
-function populateHelppiSelects(){
-  const fHelppi = document.getElementById('fHelppi');
-  const filtroHelppi = document.getElementById('filtroHelppi');
-  const editHelppi = document.getElementById('editHelppi');
-  fHelppi.innerHTML = '';
-  filtroHelppi.innerHTML = '<option value="">Todas</option>';
-  editHelppi.innerHTML = '';
-  for(let i=1;i<=getTotalHelppis();i++){
-    const val = pad2(i);
-    const opt1 = document.createElement('option');
-    opt1.value = val; opt1.textContent = 'Helppi ' + val;
-    fHelppi.appendChild(opt1);
-
-    const opt2 = document.createElement('option');
-    opt2.value = val; opt2.textContent = 'Helppi ' + val;
-    filtroHelppi.appendChild(opt2);
-
-    const opt3 = document.createElement('option');
-    opt3.value = val; opt3.textContent = 'Helppi ' + val;
-    editHelppi.appendChild(opt3);
-  }
-}
-
-function mostrarErroFormulario(msg){
-  const el = document.getElementById('formErro');
-  el.textContent = '⚠ ' + msg;
-  el.style.display = 'block';
-}
-function esconderErroFormulario(){
-  const el = document.getElementById('formErro');
-  el.style.display = 'none';
-  el.textContent = '';
-}
-
-// Retorna o registro que efetivamente ocupa um Helppi numa data (ignora quem já
-// teve "Saída" marcada, pois esses liberam o Helppi para reuso no mesmo dia).
-function obterOcupacaoHelppi(helppi, data, excludeId){
-  const registros = getRegistros().filter(r =>
-    r.helppi === helppi && r.data === data && r.id !== excludeId
-  );
-  if(!registros.length) return null;
-
-  const ultimo = registros.reduce((a,b) => (b.hora >= a.hora ? b : a));
-  return (ultimo && !ultimo.horaSaida) ? ultimo : null;
-}
-
-function addRegistro(){
-  const helppi = document.getElementById('fHelppi').value;
-  const operador = document.getElementById('fOperador').value.trim();
-  const data = document.getElementById('fData').value || todayStr();
-  const hora = nowTimeStr(); // sempre o horário exato do momento do lançamento
-  const obs = document.getElementById('fObs').value.trim();
-
-  if(!operador){
-    mostrarErroFormulario('Informe o nome do operador.');
-    return;
-  }
-
-  const emUsoPor = obterOcupacaoHelppi(helppi, data, null);
-  if(emUsoPor){
-    mostrarErroFormulario(
-      `Helppi ${helppi} já está em uso por "${emUsoPor.operador}" em ${formatDate(data)} (${emUsoPor.hora}). ` +
-      `Escolha outro Helppi ou exclua o registro existente antes de continuar.`
-    );
-    return;
-  }
-
-  esconderErroFormulario();
-
-  const list = getRegistros();
-  list.push({
-    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-    helppi, operador, data, hora, obs
-  });
-  saveRegistros(list);
-
-  document.getElementById('fOperador').value = '';
-  document.getElementById('fObs').value = '';
-
-  selecionarProximoHelppiDisponivel(data, helppi);
-
-  renderAll();
-}
-
-// Após um lançamento, avança automaticamente o campo Helppi para o próximo
-// número que ainda não tem registro na data informada (sem precisar selecionar manualmente).
-function selecionarProximoHelppiDisponivel(dataRef, atual){
-  const total = getTotalHelppis();
-  for(let i = 1; i <= total; i++){
-    const atualNum = parseInt(atual, 10);
-    const candidato = pad2(((atualNum - 1 + i) % total) + 1);
-    if(!obterOcupacaoHelppi(candidato, dataRef, null)){
-      document.getElementById('fHelppi').value = candidato;
-      return;
-    }
-  }
-  // se não achou nenhum livre (todos os terminais ocupados na data), mantém o valor atual
-}
-
-function selecionarHelppiNoFormulario(val){
-  document.getElementById('fHelppi').value = val;
-  esconderErroFormulario();
-  document.querySelector('.panel').scrollIntoView({behavior:'smooth', block:'start'});
-  document.getElementById('fOperador').focus();
-}
-
-function deleteRegistro(id){
-  pedirConfirmacao('Excluir este registro?', () => {
-    const list = getRegistros().filter(r => r.id !== id);
-    saveRegistros(list);
-    renderAll();
-  });
-}
-
-// ---- EDIÇÃO / EXCLUSÃO via modal (aberto pelo grid de situação) ----
-let editandoId = null;
-
-function abrirEdicao(id){
-  const reg = getRegistros().find(r => r.id === id);
-  if(!reg) return;
-
-  editandoId = id;
-  document.getElementById('editHelppiLabel').textContent = 'Editar Helppi ' + reg.helppi;
-  document.getElementById('editHelppi').value = reg.helppi;
-  document.getElementById('editOperador').value = reg.operador;
-  document.getElementById('editData').value = reg.data;
-  document.getElementById('editHora').value = reg.hora;
-  document.getElementById('editObs').value = reg.obs || '';
-  document.getElementById('editHoraSaida').value = reg.horaSaida || '';
-  document.getElementById('editDobra').checked = !!reg.dobra;
-  document.getElementById('editErro').style.display = 'none';
-  document.getElementById('editModal').style.display = 'flex';
-}
-
-function fecharModal(){
-  editandoId = null;
-  document.getElementById('editModal').style.display = 'none';
-}
-
-function mostrarErroEdicao(msg){
-  const el = document.getElementById('editErro');
-  el.textContent = '⚠ ' + msg;
-  el.style.display = 'block';
-}
-
-function salvarEdicao(){
-  if(!editandoId) return;
-
-  const helppi = document.getElementById('editHelppi').value;
-  const operador = document.getElementById('editOperador').value.trim();
-  const data = document.getElementById('editData').value;
-  const hora = document.getElementById('editHora').value;
-  const obs = document.getElementById('editObs').value.trim();
-  const horaSaida = document.getElementById('editHoraSaida').value || '';
-  const dobra = document.getElementById('editDobra').checked;
-
-  if(!operador){
-    mostrarErroEdicao('Informe o nome do operador.');
-    return;
-  }
-  if(!data || !hora){
-    mostrarErroEdicao('Informe data e hora.');
-    return;
-  }
-  if(horaSaida && horaSaida < hora){
-    mostrarErroEdicao('A hora de saída não pode ser antes da hora de entrada.');
-    return;
-  }
-
-  const list = getRegistros();
-  const idx = list.findIndex(r => r.id === editandoId);
-  if(idx === -1) return;
-
-  // se ainda está em uso (sem hora de saída), verifica conflito com outro
-  // lançamento ativo no mesmo Helppi/data
-  if(!horaSaida){
-    const conflito = obterOcupacaoHelppi(helppi, data, editandoId);
-    if(conflito){
-      mostrarErroEdicao(`Helppi ${helppi} já está em uso por "${conflito.operador}" em ${formatDate(data)} (${conflito.hora}).`);
-      return;
-    }
-  }
-
-  list[idx] = { ...list[idx], helppi, operador, data, hora, obs, horaSaida, dobra };
-  saveRegistros(list);
-  fecharModal();
-  renderAll();
-}
-
-function excluirEdicao(){
-  if(!editandoId) return;
-  const idParaExcluir = editandoId;
-
-  pedirConfirmacao('Excluir este lançamento?', () => {
-    const list = getRegistros().filter(r => r.id !== idParaExcluir);
-    saveRegistros(list);
-    fecharModal();
-    renderAll();
-  });
-}
-
-function limparFiltro(){
-  document.getElementById('filtroData').value = '';
-  document.getElementById('filtroHelppi').value = '';
-  document.getElementById('filtroOperador').value = '';
-  renderTable();
-}
-
-function setGridToday(){
-  document.getElementById('gridData').value = todayStr();
-  renderGrid();
-}
-
-function renderGrid(){
-  const dataFiltro = document.getElementById('gridData').value || todayStr();
-  const list = getRegistros().filter(r => r.data === dataFiltro);
-
-  // latest registro per helppi for that date (by hora)
-  const latestPerHelppi = {};
-  list.forEach(r => {
-    const cur = latestPerHelppi[r.helppi];
-    if(!cur || r.hora >= cur.hora){
-      latestPerHelppi[r.helppi] = r;
-    }
-  });
-
-  const gridEl = document.getElementById('gridHelppis');
-  gridEl.innerHTML = '';
-  let ocupadas = 0;
-  const totalHelppis = getTotalHelppis();
-
-  for(let i=1;i<=totalHelppis;i++){
-    const val = pad2(i);
-    const regBruto = latestPerHelppi[val];
-    // se o último lançamento já teve "Saída" marcada, o Helppi volta a ficar livre
-    const reg = (regBruto && !regBruto.horaSaida) ? regBruto : null;
-
-    const cell = document.createElement('div');
-    cell.className = 'cell ' + (reg ? 'ocupada' : 'livre');
-
-    if(reg){
-      ocupadas++;
-      cell.style.cursor = 'pointer';
-      cell.title = 'Clique para editar ou excluir este lançamento';
-      cell.onclick = () => abrirEdicao(reg.id);
-    }else{
-      cell.style.cursor = 'pointer';
-      cell.title = 'Clique para preencher este Helppi no formulário de registro';
-      cell.onclick = () => selecionarHelppiNoFormulario(val);
-    }
-
-    cell.innerHTML = `
-      <div class="num">Helppi ${val}</div>
-      <div class="op">${reg ? escapeHtml(reg.operador) : '—'}</div>
-      <div class="status">${reg ? reg.hora + (reg.dobra ? ' · 🔁 dobra' : '') + ' · editar' : 'Livre'}</div>
-    `;
-
-    if(reg && dataFiltro === todayStr()){
-      cell.appendChild(criarBotoesAcaoHelppi(reg));
-    }
-
-    gridEl.appendChild(cell);
-  }
-
-  document.getElementById('statOcupadas').textContent = ocupadas;
-  document.getElementById('statLivres').textContent = totalHelppis - ocupadas;
-}
-
-// Cria os botões de ação rápida "Dobra" e "Saída" dentro da célula ocupada.
-function criarBotoesAcaoHelppi(reg){
-  const wrapper = document.createElement('div');
-  wrapper.className = 'helppi-quick-actions';
-
-  const btnDobra = document.createElement('button');
-  btnDobra.className = 'mini-btn' + (reg.dobra ? ' active' : '');
-  btnDobra.textContent = reg.dobra ? '🔁 Dobra' : 'Dobra';
-  btnDobra.title = 'Marcar/desmarcar que este operador está fazendo dobra neste Helppi';
-  btnDobra.onclick = (e) => {
-    e.stopPropagation();
-    marcarDobraHelppi(reg.id);
-  };
-
-  const btnSaida = document.createElement('button');
-  btnSaida.className = 'mini-btn saida';
-  btnSaida.textContent = 'Saída';
-  btnSaida.title = 'Registrar a saída do operador e liberar este Helppi';
-  btnSaida.onclick = (e) => {
-    e.stopPropagation();
-    marcarSaidaHelppi(reg.id);
-  };
-
-  wrapper.appendChild(btnDobra);
-  wrapper.appendChild(btnSaida);
-  return wrapper;
-}
-
-function marcarDobraHelppi(id){
-  const list = getRegistros();
-  const idx = list.findIndex(r => r.id === id);
-  if(idx === -1) return;
-
-  list[idx].dobra = !list[idx].dobra;
-  saveRegistros(list);
-  renderAll();
-  showToast(list[idx].dobra
-    ? `Dobra marcada: ${list[idx].operador} · Helppi ${list[idx].helppi}.`
-    : `Marcação de dobra removida: ${list[idx].operador} · Helppi ${list[idx].helppi}.`);
-}
-
-function marcarSaidaHelppi(id){
-  const list = getRegistros();
-  const idx = list.findIndex(r => r.id === id);
-  if(idx === -1) return;
-
-  const hora = nowTimeStr();
-  list[idx].horaSaida = hora;
-  saveRegistros(list);
-  renderAll();
-  showToast(`Saída registrada às ${hora}. Helppi ${list[idx].helppi} está livre novamente.`);
-}
-
-function renderTable(){
-  const dataFiltro = document.getElementById('filtroData').value;
-  const helppiFiltro = document.getElementById('filtroHelppi').value;
-  const opFiltro = document.getElementById('filtroOperador').value.trim().toLowerCase();
-
-  const tbody = document.getElementById('tbody');
-  const emptyMsg = document.getElementById('emptyMsg');
-
-  if(!dataFiltro){
-    tbody.innerHTML = '';
-    emptyMsg.textContent = 'Selecione uma data no filtro acima para ver o histórico.';
-    emptyMsg.style.display = 'block';
-    return;
-  }
-
-  let list = getRegistros().filter(r => r.data === dataFiltro);
-
-  if(helppiFiltro) list = list.filter(r => r.helppi === helppiFiltro);
-  if(opFiltro) list = list.filter(r => r.operador.toLowerCase().includes(opFiltro));
-
-  list.sort((a,b) => (b.data+b.hora).localeCompare(a.data+a.hora));
-
-  tbody.innerHTML = '';
-
-  emptyMsg.textContent = 'Nenhum registro encontrado.';
-  emptyMsg.style.display = list.length ? 'none' : 'block';
-
-  list.forEach(r => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><span class="badge">Helppi ${r.helppi}</span></td>
-      <td>${escapeHtml(r.operador)}</td>
-      <td>${formatDate(r.data)}</td>
-      <td>${r.hora}</td>
-      <td>${r.horaSaida || '—'}</td>
-      <td>${r.dobra ? '🔁 Sim' : '—'}</td>
-      <td>${escapeHtml(r.obs) || '—'}</td>
-      <td>
-        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicao('${r.id}')">Editar</button>
-        <button class="del-btn" onclick="deleteRegistro('${r.id}')">Excluir</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
 function formatDate(iso){
   if(!iso) return '—';
   const [y,m,d] = iso.split('-');
@@ -1682,8 +1213,6 @@ function formatDate(iso){
 }
 
 function renderAll(){
-  renderGrid();
-  renderTable();
   updateBackupInfo();
 }
 
@@ -1732,24 +1261,18 @@ function statusAlmocoHoje(nome){
 function obterOperadoresDeHoje(){
   const hoje = todayStr();
 
-  const nomesHelppi = getRegistros()
-    .filter(r => r.data === hoje)
-    .map(r => (r.operador || '').trim())
-    .filter(Boolean);
-
-  // colaboradores marcados como presentes hoje (sem ter usado nenhum Helppi)
-  // entram na mesma lista, valendo as mesmas regras: almoço, entrada/saída etc.
+  // colaboradores marcados como presentes hoje entram na lista, valendo
+  // as mesmas regras: almoço, entrada/saída etc.
   const dadosPresenca = getPresencaLoja();
   const idsMarcadosHoje = new Set(
     dadosPresenca.marcacoes.filter(m => m.data === hoje).map(m => m.operadorId)
   );
-  const nomesPresenca = dadosPresenca.operadores
+  const nomes = dadosPresenca.operadores
     .filter(op => idsMarcadosHoje.has(op.id))
     .map(op => (op.nome || '').trim())
     .filter(Boolean);
 
-  const nomes = [...new Set([...nomesHelppi, ...nomesPresenca])];
-  return nomes.sort((a,b) => a.localeCompare(b, 'pt-BR'));
+  return [...new Set(nomes)].sort((a,b) => a.localeCompare(b, 'pt-BR'));
 }
 
 function renderListaAlmocoRapido(){
@@ -2019,11 +1542,12 @@ function atualizarVagaPresencaAutomatica(){
     campo.value = '';
     return;
   }
-  // "presença" = quantidade de operadores distintos com lançamento de Helppi nessa data
-  const operadoresUnicos = new Set(
-    getRegistros().filter(r => r.data === data).map(r => r.operador)
+  // "presença" = quantidade de operadores distintos marcados presentes nessa data
+  const dadosPresenca = getPresencaLoja();
+  const idsMarcados = new Set(
+    dadosPresenca.marcacoes.filter(m => m.data === data).map(m => m.operadorId)
   );
-  campo.value = operadoresUnicos.size;
+  campo.value = idsMarcados.size;
 }
 
 function addVaga(){
@@ -2667,8 +2191,6 @@ async function importBackup(event){
 
       if(maiorTotalHelppis !== null && maiorTotalHelppis > getTotalHelppis()){
         saveTotalHelppis(maiorTotalHelppis);
-        atualizarTituloSituacaoHelppis();
-        populateHelppiSelects();
       }
 
       renderAll();
@@ -3003,23 +2525,12 @@ function renderIfoodQr(){
 
 // ---- INIT ----
 function init(){
-  atualizarTituloSituacaoHelppis();
-  populateHelppiSelects();
-  document.getElementById('fData').value = todayStr();
   atualizarRelogio();
   setInterval(atualizarRelogio, 1000);
-  document.getElementById('gridData').value = todayStr();
 
   document.getElementById('presencaLojaData').value = todayStr();
   document.getElementById('presencaLojaData').addEventListener('change', renderListaPresencaRapido);
   renderListaPresencaRapido();
-
-  document.getElementById('gridData').addEventListener('change', renderGrid);
-  document.getElementById('filtroData').addEventListener('change', renderTable);
-  document.getElementById('filtroHelppi').addEventListener('change', renderTable);
-  document.getElementById('filtroOperador').addEventListener('input', renderTable);
-  document.getElementById('fHelppi').addEventListener('change', esconderErroFormulario);
-  document.getElementById('fData').addEventListener('change', esconderErroFormulario);
 
   // aba de almoço
   document.getElementById('filtroAlmocoData').addEventListener('change', renderTabelaAlmoco);
@@ -3048,12 +2559,6 @@ function init(){
   atualizarStatusAutoBackup();
   setInterval(verificarBackupAutomatico, 30000);
 
-  ['fOperador','fObs'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => {
-      if(e.key === 'Enter') addRegistro();
-    });
-  });
-
   document.getElementById('novoOperadorPresencaNome').addEventListener('keydown', e => {
     if(e.key === 'Enter') adicionarOperadorPresenca();
   });
@@ -3062,8 +2567,6 @@ function init(){
     if(e.key === 'Escape'){
       if(document.getElementById('confirmModal').style.display !== 'none'){
         fecharConfirmModal();
-      }else if(document.getElementById('editModal').style.display !== 'none'){
-        fecharModal();
       }else if(document.getElementById('editAlmocoModal').style.display !== 'none'){
         fecharModalAlmoco();
       }else if(document.getElementById('editVagaModal').style.display !== 'none'){
