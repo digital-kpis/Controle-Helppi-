@@ -242,6 +242,27 @@
     overflow:visible;
     text-overflow:clip;
   }
+
+  /* Lista de presença: cards mais largos e botões que quebram linha
+     (tem até 4 botões, não cabem no grid apertado do resto do app) */
+  #listaPresencaRapido{
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  #listaPresencaRapido .cell{
+    min-height: auto;
+  }
+  #listaPresencaRapido .helppi-quick-actions{
+    flex-wrap: wrap;
+  }
+  #listaPresencaRapido .helppi-quick-actions .mini-btn{
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  @media (max-width: 420px){
+    #listaPresencaRapido{
+      grid-template-columns: 1fr;
+    }
+  }
 </style>
 </head>
 <body>
