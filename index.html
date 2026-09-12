@@ -351,7 +351,7 @@
       <button class="secondary" onclick="limparFiltroPresenca()">Limpar filtro</button>
     </div>
   </div>
-  <div style="overflow-x:auto;">
+  <div id="wrapHistoricoPresenca" style="overflow-x:auto;">
     <table>
       <thead>
         <tr><th>Nome</th><th>Data</th><th>Entrada</th><th>Saída</th><th>Dobra</th></tr>
@@ -360,6 +360,7 @@
     </table>
   </div>
   <div id="emptyHistoricoPresencaMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+  <div id="selecioneDataHistoricoMsg" class="hint">Selecione uma data no filtro acima para ver o histórico daquele dia.</div>
 </div>
 
 </div><!-- fim #abaHelppis -->
@@ -1255,6 +1256,18 @@ function renderHistoricoPresenca(){
   const dataFiltro = document.getElementById('filtroPresencaData').value;
   const operadorFiltro = document.getElementById('filtroPresencaNome').value;
 
+  const wrap = document.getElementById('wrapHistoricoPresenca');
+  const msgSelecione = document.getElementById('selecioneDataHistoricoMsg');
+
+  if(!dataFiltro){
+    wrap.style.display = 'none';
+    document.getElementById('emptyHistoricoPresencaMsg').style.display = 'none';
+    msgSelecione.style.display = 'block';
+    return;
+  }
+  msgSelecione.style.display = 'none';
+  wrap.style.display = 'block';
+
   const dados = getPresencaLoja();
   const nomesPorId = {};
   dados.operadores.forEach(op => { nomesPorId[op.id] = op.nome; });
@@ -1264,7 +1277,7 @@ function renderHistoricoPresenca(){
     nome: nomesPorId[m.operadorId] || '(operador removido)'
   }));
 
-  if(dataFiltro) lista = lista.filter(m => m.data === dataFiltro);
+  lista = lista.filter(m => m.data === dataFiltro);
   if(operadorFiltro) lista = lista.filter(m => m.operadorId === operadorFiltro);
 
   lista.sort((a,b) => (b.data + (b.hora||'')).localeCompare(a.data + (a.hora||'')));
@@ -1272,6 +1285,7 @@ function renderHistoricoPresenca(){
   const tbody = document.getElementById('tbodyHistoricoPresenca');
   tbody.innerHTML = '';
   document.getElementById('emptyHistoricoPresencaMsg').style.display = lista.length ? 'none' : 'block';
+  if(!lista.length) wrap.style.display = 'none';
 
   lista.forEach(m => {
     const tr = document.createElement('tr');
