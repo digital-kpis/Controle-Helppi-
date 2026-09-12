@@ -26,11 +26,15 @@
   }
   *{box-sizing:border-box;}
   body{
-    margin:0;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
     background:var(--bg);
     color:var(--text);
     padding:20px;
+    max-width:1100px;
+    margin:0 auto;
+  }
+  @media (max-width:480px){
+    body{ padding:14px; }
   }
   h1{font-size:1.4rem;margin:0 0 4px;}
   .sub{color:var(--muted);font-size:.85rem;margin-bottom:20px;}
@@ -54,7 +58,7 @@
     gap:10px;
     align-items:flex-end;
   }
-  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;}
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;max-width:320px;}
   .field label{font-size:.75rem;color:var(--muted);}
   input,select{
     background:var(--panel2);
@@ -216,6 +220,9 @@
     margin-bottom:18px;
     border-bottom:1px solid var(--border);
     padding-bottom:0;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
   }
   .tab-btn{
     background:transparent;
@@ -226,6 +233,8 @@
     padding:10px 4px;
     font-size:.85rem;
     font-weight:600;
+    white-space:nowrap;
+    flex-shrink:0;
   }
   .tab-btn.active{
     color:var(--text);
@@ -263,12 +272,26 @@
       grid-template-columns: 1fr;
     }
   }
+
+  .stat-box{
+    background:var(--panel2); border:1px solid var(--border); border-radius:10px;
+    padding:10px 18px; min-width:100px; text-align:center;
+  }
+  .stat-num{ font-size:1.5rem; font-weight:800; color:var(--accent); line-height:1.1; }
+  .stat-label{ font-size:.7rem; color:var(--muted); margin-top:2px; }
+
+  @media (min-width: 700px){
+    h1{ font-size: 1.65rem; }
+    .panel{ padding: 22px 26px; }
+    .panel h2{ font-size: 1rem; }
+    .grid{ gap: 10px; }
+  }
 </style>
 </head>
 <body>
 
 <h1>Controle de Helppis</h1>
-<div class="sub">Acompanhamento dos Helppis 01 a 50 · operador em uso · histórico por data</div>
+<div class="sub">Cadastro de operadores, presença, almoço, vagas e produtividade da loja</div>
 
 <div class="tabs">
   <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">👤 Operadores</button>
@@ -298,7 +321,45 @@
       <input type="date" id="presencaLojaData">
     </div>
   </div>
+  <div class="stats-row" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <div class="stat-box">
+      <div class="stat-num" id="statTotalOperadores">0</div>
+      <div class="stat-label">cadastrados</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="statTrabalhandoHoje">0</div>
+      <div class="stat-label">trabalhando no dia</div>
+    </div>
+  </div>
   <div id="listaPresencaRapido" class="grid"></div>
+</div>
+
+<!-- HISTÓRICO DE PRESENÇA -->
+<div class="panel">
+  <h2>Histórico de presença</h2>
+  <div class="hint">Consulte quem trabalhou em qualquer dia, com horário de entrada, saída e dobra.</div>
+  <div class="toolbar">
+    <div class="field">
+      <label>Filtrar por data</label>
+      <input type="date" id="filtroPresencaData">
+    </div>
+    <div class="field">
+      <label>Filtrar por nome</label>
+      <select id="filtroPresencaNome"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroPresenca()">Limpar filtro</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Nome</th><th>Data</th><th>Entrada</th><th>Saída</th><th>Dobra</th></tr>
+      </thead>
+      <tbody id="tbodyHistoricoPresenca"></tbody>
+    </table>
+  </div>
+  <div id="emptyHistoricoPresencaMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
 </div>
 
 </div><!-- fim #abaHelppis -->
@@ -308,7 +369,7 @@
 <!-- LANÇAR ALMOÇO -->
 <div class="panel">
   <h2>Lançar horário de almoço — hoje (<span id="almocoHojeLabel"></span>)</h2>
-  <div class="hint">Lista com os operadores que têm lançamento de Helppi hoje. Clique no botão para registrar o horário atual, sem precisar selecionar nada.</div>
+  <div class="hint">Lista com os operadores marcados como presentes hoje. Clique no botão para registrar o horário atual, sem precisar selecionar nada.</div>
   <div class="stats">
     <div class="stat"><b id="statEmAlmoco">0</b>em almoço</div>
     <div class="stat"><b id="statTrabalhando">0</b>trabalhando</div>
@@ -816,6 +877,8 @@ async function carregarDadosNuvem(){
     renderAlmocoTudo();
     renderFiltroAlmocoColaborador();
     renderListaPresencaRapido();
+    renderFiltroPresencaNome();
+    renderHistoricoPresenca();
     renderVagasTudo();
     renderProdutividade();
     renderAcessos();
@@ -856,6 +919,8 @@ function handleRealtimeRow(row){
         if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
         localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(_presencaLojaCache));
         renderListaPresencaRapido();
+        renderFiltroPresencaNome();
+        renderHistoricoPresenca();
         renderListaAlmocoRapido();
         updateBackupInfo();
       }else if(row.id === 'vagas'){
@@ -1000,6 +1065,8 @@ function adicionarOperadorPresenca(){
   savePresencaLoja(dados);
   input.value = '';
   renderListaPresencaRapido();
+  renderFiltroPresencaNome();
+  renderHistoricoPresenca();
   showToast(`"${nome}" adicionado à lista.`);
 }
 
@@ -1022,6 +1089,7 @@ function marcarPresencaRapida(operadorId, nome){
   });
   savePresencaLoja(dados);
   renderListaPresencaRapido();
+  renderHistoricoPresenca();
   if(data === todayStr()) renderListaAlmocoRapido();
   showToast(`Presença marcada: ${nome} em ${formatDate(data)}.`);
 }
@@ -1032,6 +1100,7 @@ function desmarcarPresenca(operadorId, nome){
   dados.marcacoes = dados.marcacoes.filter(m => !(m.operadorId === operadorId && m.data === data));
   savePresencaLoja(dados);
   renderListaPresencaRapido();
+  renderHistoricoPresenca();
   if(data === todayStr()) renderListaAlmocoRapido();
   showToast(`Presença de "${nome}" desmarcada em ${formatDate(data)}.`);
 }
@@ -1044,6 +1113,7 @@ function marcarSaidaOperador(operadorId, nome){
   dados.marcacoes[idx].horaSaida = nowTimeStr();
   savePresencaLoja(dados);
   renderListaPresencaRapido();
+  renderHistoricoPresenca();
   showToast(`Saída registrada: ${nome} às ${dados.marcacoes[idx].horaSaida}.`);
 }
 
@@ -1055,6 +1125,7 @@ function desfazerSaidaOperador(operadorId, nome){
   delete dados.marcacoes[idx].horaSaida;
   savePresencaLoja(dados);
   renderListaPresencaRapido();
+  renderHistoricoPresenca();
   showToast(`Saída desfeita: ${nome} está presente novamente.`);
 }
 
@@ -1066,6 +1137,7 @@ function toggleDobraOperador(operadorId, nome){
   dados.marcacoes[idx].dobra = !dados.marcacoes[idx].dobra;
   savePresencaLoja(dados);
   renderListaPresencaRapido();
+  renderHistoricoPresenca();
   showToast(dados.marcacoes[idx].dobra
     ? `Dobra marcada: ${nome}.`
     : `Marcação de dobra removida: ${nome}.`);
@@ -1077,6 +1149,8 @@ function removerOperadorPresenca(operadorId, nome){
     dados.operadores = dados.operadores.filter(o => o.id !== operadorId);
     savePresencaLoja(dados);
     renderListaPresencaRapido();
+    renderFiltroPresencaNome();
+    renderHistoricoPresenca();
   });
 }
 
@@ -1085,6 +1159,10 @@ function renderListaPresencaRapido(){
   const dados = getPresencaLoja();
   const container = document.getElementById('listaPresencaRapido');
   container.innerHTML = '';
+
+  document.getElementById('statTotalOperadores').textContent = dados.operadores.length;
+  document.getElementById('statTrabalhandoHoje').textContent =
+    dados.marcacoes.filter(m => m.data === dataSel).length;
 
   if(!dados.operadores.length){
     container.innerHTML = '<div class="hint">Nenhum operador adicionado ainda. Use o campo acima.</div>';
@@ -1149,6 +1227,62 @@ function renderListaPresencaRapido(){
 
     cell.appendChild(wrapper);
     container.appendChild(cell);
+  });
+}
+
+function renderFiltroPresencaNome(){
+  const select = document.getElementById('filtroPresencaNome');
+  const valorAnterior = select.value;
+  const dados = getPresencaLoja();
+  const nomes = [...dados.operadores].sort((a,b) => a.nome.localeCompare(b.nome, 'pt'));
+
+  select.innerHTML = '<option value="">Todos</option>';
+  nomes.forEach(op => {
+    const opt = document.createElement('option');
+    opt.value = op.id; opt.textContent = op.nome;
+    select.appendChild(opt);
+  });
+  if(nomes.some(op => op.id === valorAnterior)) select.value = valorAnterior;
+}
+
+function limparFiltroPresenca(){
+  document.getElementById('filtroPresencaData').value = '';
+  document.getElementById('filtroPresencaNome').value = '';
+  renderHistoricoPresenca();
+}
+
+function renderHistoricoPresenca(){
+  const dataFiltro = document.getElementById('filtroPresencaData').value;
+  const operadorFiltro = document.getElementById('filtroPresencaNome').value;
+
+  const dados = getPresencaLoja();
+  const nomesPorId = {};
+  dados.operadores.forEach(op => { nomesPorId[op.id] = op.nome; });
+
+  let lista = dados.marcacoes.map(m => ({
+    ...m,
+    nome: nomesPorId[m.operadorId] || '(operador removido)'
+  }));
+
+  if(dataFiltro) lista = lista.filter(m => m.data === dataFiltro);
+  if(operadorFiltro) lista = lista.filter(m => m.operadorId === operadorFiltro);
+
+  lista.sort((a,b) => (b.data + (b.hora||'')).localeCompare(a.data + (a.hora||'')));
+
+  const tbody = document.getElementById('tbodyHistoricoPresenca');
+  tbody.innerHTML = '';
+  document.getElementById('emptyHistoricoPresencaMsg').style.display = lista.length ? 'none' : 'block';
+
+  lista.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(m.nome)}</td>
+      <td>${formatDate(m.data)}</td>
+      <td>${m.hora || '—'}</td>
+      <td>${m.horaSaida || '—'}</td>
+      <td>${m.dobra ? '🔁 Sim' : '—'}</td>
+    `;
+    tbody.appendChild(tr);
   });
 }
 
@@ -2552,6 +2686,11 @@ function init(){
   document.getElementById('presencaLojaData').value = todayStr();
   document.getElementById('presencaLojaData').addEventListener('change', renderListaPresencaRapido);
   renderListaPresencaRapido();
+
+  document.getElementById('filtroPresencaData').addEventListener('change', renderHistoricoPresenca);
+  document.getElementById('filtroPresencaNome').addEventListener('change', renderHistoricoPresenca);
+  renderFiltroPresencaNome();
+  renderHistoricoPresenca();
 
   // aba de almoço
   document.getElementById('filtroAlmocoData').addEventListener('change', renderTabelaAlmoco);
