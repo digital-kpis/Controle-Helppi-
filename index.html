@@ -1,0 +1,2906 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Controle de Helppis</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel2:#1e222b;
+    --border:#2a2f3a;
+    --text:#e6e8ec;
+    --muted:#8b93a3;
+    --accent:#4f8cff;
+    --green:#2fbf71;
+    --red:#e15656;
+    --yellow:#e0a640;
+  }
+  *{box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:20px 32px;
+  }
+  @media (max-width:480px){
+    body{ padding:14px; }
+  }
+  h1{font-size:1.4rem;margin:0 0 4px;}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:20px;}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:18px;
+  }
+  .panel h2{
+    font-size:.95rem;
+    margin:0 0 12px;
+    color:var(--accent);
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:flex-end;
+  }
+  .field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px;max-width:320px;}
+  .field label{font-size:.75rem;color:var(--muted);}
+  input,select{
+    background:var(--panel2);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:.9rem;
+  }
+  input:focus,select:focus{outline:1px solid var(--accent);}
+  button{
+    background:var(--accent);
+    color:#fff;
+    border:none;
+    padding:9px 16px;
+    border-radius:8px;
+    font-size:.85rem;
+    cursor:pointer;
+    font-weight:600;
+  }
+  button.secondary{background:var(--panel2);border:1px solid var(--border);color:var(--text);}
+  button.danger{background:var(--red);}
+  button:hover{filter:brightness(1.1);}
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+    gap:8px;
+  }
+  .cell{
+    border-radius:10px;
+    padding:8px;
+    border:1px solid var(--border);
+    background:var(--panel2);
+    min-height:64px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .cell.livre{border-color:var(--green);}
+  .cell.ocupada{border-color:var(--red);background:rgba(225,86,86,.08);}
+  .cell.almoco-feito{border-color:var(--accent);background:rgba(79,140,255,.08);}
+  .cell .num{font-weight:700;font-size:.85rem;}
+  .cell .op{font-size:.72rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cell .status{font-size:.65rem;color:var(--muted);}
+  .helppi-quick-actions{
+    display:flex;
+    gap:4px;
+    margin-top:6px;
+  }
+  .mini-btn{
+    flex:1;
+    background:var(--panel);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:6px 4px;
+    border-radius:6px;
+    font-size:.68rem;
+    font-weight:600;
+    cursor:pointer;
+    min-height:30px;
+  }
+  .mini-btn.active{
+    background:var(--yellow);
+    color:#1a1300;
+    border-color:var(--yellow);
+  }
+  .mini-btn.saida{
+    background:var(--red);
+    color:#fff;
+    border-color:var(--red);
+  }
+  .mini-btn:hover{filter:brightness(1.15);}
+  .dobra-badge{
+    display:inline-block; background:rgba(240,196,72,.18); color:var(--yellow);
+    border:1px solid rgba(240,196,72,.4); border-radius:20px; font-size:.66rem;
+    font-weight:700; padding:1px 7px; margin-left:5px; white-space:nowrap; vertical-align:middle;
+  }
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:600;font-size:.75rem;text-transform:uppercase;}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .empty{color:var(--muted);text-align:center;padding:20px;font-size:.85rem;}
+  .form-erro{
+    margin-top:12px;
+    background:rgba(225,86,86,.12);
+    border:1px solid var(--red);
+    color:#ff9c9c;
+    padding:10px 14px;
+    border-radius:8px;
+    font-size:.85rem;
+  }
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.6);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+    padding:16px;
+  }
+  .modal-box{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+    width:min(380px, 100%);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .modal-box h3{margin:0 0 6px;font-size:1rem;color:var(--accent);}
+  .confirm-overlay{z-index:1010;}
+  .auto-backup-box{
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid var(--border);
+  }
+  .switch-label{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:.85rem;
+    cursor:pointer;
+  }
+  .switch-label input{width:16px;height:16px;cursor:pointer;}
+  .hint{color:var(--muted);font-size:.72rem;margin-top:6px;line-height:1.4;}
+  .toast{
+    position:fixed;
+    bottom:20px;
+    left:50%;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--panel2);
+    border:1px solid var(--accent);
+    color:var(--text);
+    padding:12px 18px;
+    border-radius:10px;
+    font-size:.85rem;
+    box-shadow:0 4px 20px rgba(0,0,0,.4);
+    z-index:2000;
+    opacity:0;
+    transition:opacity .25s ease, transform .25s ease;
+    pointer-events:none;
+    max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .badge{font-size:.7rem;padding:2px 8px;border-radius:20px;background:var(--panel2);border:1px solid var(--border);}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+  .stats{display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:.8rem;}
+  .stat b{font-size:1.1rem;display:block;color:var(--accent);}
+  .file-input-wrap{position:relative;overflow:hidden;display:inline-block;}
+  .file-input-wrap input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+  .del-btn{background:transparent;border:none;color:var(--red);font-size:.8rem;cursor:pointer;padding:2px 6px;}
+  #backupInfo{font-size:.75rem;color:var(--muted);margin-top:8px;}
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    border-bottom:1px solid var(--border);
+    padding-bottom:0;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .tab-btn{
+    background:transparent;
+    color:var(--muted);
+    border:none;
+    border-bottom:2px solid transparent;
+    border-radius:0;
+    padding:10px 4px;
+    font-size:.85rem;
+    font-weight:600;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .tab-btn.active{
+    color:var(--text);
+    border-bottom:2px solid var(--accent);
+  }
+  .tab-btn:hover{filter:none;color:var(--text);}
+  .almoco-quick-nome{font-weight:700;font-size:.85rem;}
+  .cell .almoco-quick-status{
+    font-size:.65rem;
+    color:var(--muted);
+    margin-top:2px;
+    line-height:1.3;
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip;
+  }
+
+  /* Lista de presença: cards mais largos e botões que quebram linha
+     (tem até 4 botões, não cabem no grid apertado do resto do app) */
+  #listaPresencaRapido{
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+  #listaPresencaRapido .cell{
+    min-height: auto;
+  }
+  #listaPresencaRapido .helppi-quick-actions{
+    flex-wrap: wrap;
+  }
+  #listaPresencaRapido .helppi-quick-actions .mini-btn{
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+  @media (max-width: 420px){
+    #listaPresencaRapido{
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-box{
+    background:var(--panel2); border:1px solid var(--border); border-radius:10px;
+    padding:10px 18px; min-width:100px; text-align:center;
+  }
+  .stat-num{ font-size:1.5rem; font-weight:800; color:var(--accent); line-height:1.1; }
+  .stat-label{ font-size:.7rem; color:var(--muted); margin-top:2px; }
+
+  @media (min-width: 700px){
+    h1{ font-size: 1.65rem; }
+    .panel{ padding: 22px 26px; }
+    .panel h2{ font-size: 1rem; }
+    .grid{ gap: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Controle de Helppis</h1>
+<div class="sub">Cadastro de operadores, presença, almoço, vagas e produtividade da loja</div>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabBtnHelppis" onclick="mudarAba('helppis')">👤 Operadores</button>
+  <button class="tab-btn" id="tabBtnAlmoco" onclick="mudarAba('almoco')">🍽 Horário de Almoço</button>
+  <button class="tab-btn" id="tabBtnVagas" onclick="mudarAba('vagas')">📊 Vagas</button>
+  <button class="tab-btn" id="tabBtnProdutividade" onclick="mudarAba('produtividade')">📈 Produtividade</button>
+  <button class="tab-btn" id="tabBtnIfood" onclick="mudarAba('ifood')">📱 Acesso iFood</button>
+</div>
+
+<div id="abaHelppis" class="aba">
+
+<!-- CADASTRO DE OPERADORES -->
+<div class="panel">
+  <h2>Cadastro de operadores</h2>
+  <div class="sub" style="margin-bottom:14px;">Lista fixa de operadores da loja, com presença por dia.</div>
+  <div class="row" style="margin-bottom:14px;">
+    <div class="field" style="flex:2;">
+      <label>Adicionar operador à lista</label>
+      <input type="text" id="novoOperadorPresencaNome" placeholder="Nome completo">
+    </div>
+    <div class="field" style="flex:0;">
+      <label>&nbsp;</label>
+      <button onclick="adicionarOperadorPresenca()">+ Adicionar</button>
+    </div>
+    <div class="field">
+      <label>Marcar presença no dia</label>
+      <input type="date" id="presencaLojaData">
+    </div>
+    <div class="field">
+      <label>Buscar operador</label>
+      <input type="text" id="buscaOperadorPresenca" placeholder="Digite o nome..." oninput="renderListaPresencaRapido()">
+    </div>
+  </div>
+  <div class="stats-row" style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+    <div class="stat-box">
+      <div class="stat-num" id="statTotalOperadores">0</div>
+      <div class="stat-label">cadastrados</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" id="statTrabalhandoHoje">0</div>
+      <div class="stat-label">trabalhando no dia</div>
+    </div>
+  </div>
+  <div id="listaPresencaRapido" class="grid"></div>
+</div>
+
+<!-- HISTÓRICO DE PRESENÇA -->
+<div class="panel">
+  <h2>Histórico de presença</h2>
+  <div class="hint">Consulte quem trabalhou em qualquer dia, com horário de entrada, saída e dobra.</div>
+  <div class="toolbar">
+    <div class="field">
+      <label>Filtrar por data</label>
+      <input type="date" id="filtroPresencaData">
+    </div>
+    <div class="field">
+      <label>Filtrar por nome</label>
+      <select id="filtroPresencaNome"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroPresenca()">Limpar filtro</button>
+    </div>
+  </div>
+  <div id="wrapHistoricoPresenca" style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Nome</th><th>Data</th><th>Entrada</th><th>Saída</th><th>Dobra</th></tr>
+      </thead>
+      <tbody id="tbodyHistoricoPresenca"></tbody>
+    </table>
+  </div>
+  <div id="emptyHistoricoPresencaMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+  <div id="selecioneDataHistoricoMsg" class="hint">Selecione uma data no filtro acima para ver o histórico daquele dia.</div>
+</div>
+
+</div><!-- fim #abaHelppis -->
+
+<div id="abaAlmoco" class="aba" style="display:none;">
+
+<!-- LANÇAR ALMOÇO -->
+<div class="panel">
+  <h2>Lançar horário de almoço — hoje (<span id="almocoHojeLabel"></span>)</h2>
+  <div class="hint">Lista com os operadores marcados como presentes hoje. Clique no botão para registrar o horário atual, sem precisar selecionar nada.</div>
+  <div class="stats">
+    <div class="stat"><b id="statEmAlmoco">0</b>em almoço</div>
+    <div class="stat"><b id="statTrabalhando">0</b>trabalhando</div>
+  </div>
+  <div id="listaAlmocoRapido" class="grid"></div>
+</div>
+
+<!-- HISTÓRICO DE ALMOÇO -->
+<div class="panel">
+  <h2>Histórico de almoço</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>Filtrar por data</label>
+      <input type="date" id="filtroAlmocoData">
+    </div>
+    <div class="field">
+      <label>Filtrar por colaborador</label>
+      <select id="filtroAlmocoColaborador"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroAlmoco()">Limpar filtro</button>
+    </div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Colaborador</th><th>Data</th><th>Saída</th><th>Retorno</th><th>Duração</th><th>Observação</th><th></th></tr>
+      </thead>
+      <tbody id="tbodyAlmoco"></tbody>
+    </table>
+  </div>
+  <div id="emptyAlmocoMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+</div>
+
+</div><!-- fim #abaAlmoco -->
+
+<div id="abaVagas" class="aba" style="display:none;">
+
+<!-- LANÇAR VAGAS DO DIA -->
+<div class="panel">
+  <h2>Vagas do dia</h2>
+  <div class="hint">Cada lançamento é sempre um registro novo. "Presença" é calculado automaticamente pela quantidade de operadores com lançamento de Helppi na data escolhida.</div>
+  <div class="row">
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="fVagaData">
+    </div>
+    <div class="field">
+      <label>Vagas orçadas</label>
+      <input type="number" id="fVagaOrcado" min="0" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Vagas preenchidas</label>
+      <input type="number" id="fVagaPreenchido" min="0" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Presença</label>
+      <input type="number" id="fVagaPresenca" min="0" placeholder="0" readonly style="opacity:.75; cursor:not-allowed;">
+    </div>
+    <div class="field">
+      <label>Em aberto</label>
+      <input type="number" id="fVagaEmAberto" min="0" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Faltas do dia</label>
+      <input type="number" id="fVagaFaltas" min="0" placeholder="0">
+    </div>
+    <div class="field" style="flex:2;">
+      <label>Observação (opcional)</label>
+      <input type="text" id="fVagaObs" placeholder="Ex: turno tarde">
+    </div>
+    <div class="field" style="flex:0;">
+      <button onclick="addVaga()">Salvar</button>
+    </div>
+  </div>
+  <div id="formVagaErro" class="form-erro" style="display:none;"></div>
+</div>
+
+<!-- HISTÓRICO DE VAGAS -->
+<div class="panel">
+  <h2>Histórico de vagas</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>De</label>
+      <input type="date" id="filtroVagaDataIni">
+    </div>
+    <div class="field">
+      <label>Até</label>
+      <input type="date" id="filtroVagaDataFim">
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroVagas()">Limpar filtro</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="statVagaOrcado">0</b>orçadas (período)</div>
+    <div class="stat"><b id="statVagaPreenchido">0</b>preenchidas (período)</div>
+    <div class="stat"><b id="statVagaFaltas">0</b>faltas (período)</div>
+    <div class="stat"><b id="statVagaPct">0%</b>preenchimento</div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Data</th><th>Orçadas</th><th>Preenchidas</th><th>Presença</th><th>Em aberto</th><th>Faltas</th><th>% Preenchido</th><th>Observação</th><th></th></tr>
+      </thead>
+      <tbody id="tbodyVagas"></tbody>
+    </table>
+  </div>
+  <div id="emptyVagasMsg" class="empty" style="display:none;">Nenhum registro encontrado.</div>
+</div>
+
+</div><!-- fim #abaVagas -->
+
+<div id="abaProdutividade" class="aba" style="display:none;">
+
+<!-- IMPORTAR PLANILHAS -->
+<div class="panel">
+  <h2>Importar planilhas de produtividade</h2>
+  <div class="hint">
+    Envie aqui a(s) planilha(s) de pedidos separados (colunas como "separador", "início da separação", "total de itens").
+    Só são processados os pedidos cuja coluna "separador" traz um código de terminal (ex: "helppi13") — eles são
+    cruzados com o histórico da aba Helppis (Helppi + data + horário) para descobrir automaticamente qual operador
+    estava nele naquele momento. Pedidos que já vêm com o nome do operador na planilha são ignorados.
+    Pedidos já importados antes (mesmo ID) não são contados de novo, então você pode subir planilhas repetidas ou de
+    períodos diferentes sem duplicar.
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <div class="file-input-wrap">
+      <button>⬆ Selecionar planilha(s) (.xlsx)</button>
+      <input type="file" id="produtividadeFile" accept=".xlsx,.xls" multiple onchange="processarPlanilhasProdutividade(event)">
+    </div>
+    <button class="danger" onclick="limparProdutividade()">Apagar dados de produtividade</button>
+  </div>
+  <div id="produtividadeStatus" class="hint" style="margin-top:8px;"></div>
+</div>
+
+<!-- PRODUTIVIDADE POR OPERADOR -->
+<div class="panel">
+  <h2>Produtividade por operador</h2>
+  <div class="toolbar">
+    <div class="field">
+      <label>De</label>
+      <input type="date" id="filtroProdDataIni">
+    </div>
+    <div class="field">
+      <label>Até</label>
+      <input type="date" id="filtroProdDataFim">
+    </div>
+    <div class="field" style="flex:2;">
+      <label>Operador</label>
+      <input type="text" id="filtroProdOperador" placeholder="Filtrar por nome">
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button class="secondary" onclick="limparFiltroProdutividade()">Limpar filtro</button>
+    </div>
+    <div class="field" style="flex:0;justify-content:flex-end;">
+      <button onclick="exportarProdutividadeCSV()">⬇ Exportar CSV</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="statProdPedidos">0</b>pedidos (período)</div>
+    <div class="stat"><b id="statProdOperadores">0</b>operadores identificados</div>
+    <div class="stat"><b id="statProdSemOperador">0</b>pedidos sem operador</div>
+  </div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Helppi</th><th>Operador</th><th>Data</th><th>Pedidos</th><th>Itens totais</th><th>Tempo médio</th></tr>
+      </thead>
+      <tbody id="tbodyProdutividade"></tbody>
+    </table>
+  </div>
+  <div id="emptyProdMsg" class="empty" style="display:none;">Nenhum dado de produtividade encontrado. Importe uma planilha acima.</div>
+  <div id="produtividadeInfo" class="hint" style="margin-top:8px;"></div>
+</div>
+
+</div><!-- fim #abaProdutividade -->
+
+<div id="abaIfood" class="aba" style="display:none;">
+<div class="panel">
+  <h2>📱 Acesso ao Separador iFood</h2>
+  <div class="hint">
+    Peça para o operador escanear o QR code abaixo com a câmera do celular para abrir a página de login do
+    separador do iFood, e usar o usuário e senha informados logo abaixo.
+  </div>
+  <div style="display:flex; flex-direction:column; align-items:center; gap:16px; margin-top:18px;">
+    <div style="background:#fff; padding:16px; border-radius:12px; width:220px; height:220px; display:flex; align-items:center; justify-content:center;">
+      <canvas id="ifoodQrCanvas" width="188" height="188"></canvas>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-size:15px; color:var(--muted, #9aa4b2); margin-bottom:4px;">Ou acesse diretamente pelo link:</div>
+      <a href="https://separador.ifood.com.br" target="_blank" rel="noopener" style="font-size:17px; font-weight:700; color:var(--accent, #4f8cff); text-decoration:none;">separador.ifood.com.br</a>
+    </div>
+  </div>
+
+  <div style="max-width:360px; margin:26px auto 0; display:flex; flex-direction:column; gap:12px;">
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:14px 16px;">
+      <div style="font-size:13px; color:var(--muted, #9aa4b2); text-transform:uppercase; letter-spacing:.04em;">Usuário</div>
+      <div style="font-size:18px; font-weight:700; margin-top:2px; word-break:break-all;" id="ifoodUsuarioTexto">2840669_helppixx</div>
+    </div>
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:14px 16px;">
+      <div style="font-size:13px; color:var(--muted, #9aa4b2); text-transform:uppercase; letter-spacing:.04em;">Senha</div>
+      <div style="font-size:18px; font-weight:700; margin-top:2px; word-break:break-all;" id="ifoodSenhaTexto">Maracana@2025</div>
+    </div>
+  </div>
+</div>
+
+<!-- CADASTRAR NOVOS ACESSOS -->
+<div class="panel">
+  <h2>Cadastrar novo acesso</h2>
+  <div class="hint">Cadastre outros logins/sistemas que os operadores precisem acessar (cada um ganha seu próprio QR code).</div>
+  <div class="row" style="margin-top:10px;">
+    <div class="field">
+      <label>Nome / descrição</label>
+      <input type="text" id="fAcessoNome" placeholder="Ex: Portal do colaborador">
+    </div>
+    <div class="field">
+      <label>Link</label>
+      <input type="text" id="fAcessoLink" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="fAcessoUsuario" placeholder="Usuário (opcional)">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="text" id="fAcessoSenha" placeholder="Senha (opcional)">
+    </div>
+    <div class="field" style="flex:0; justify-content:flex-end;">
+      <button onclick="addAcesso()">Salvar acesso</button>
+    </div>
+  </div>
+  <div id="acessoErro" class="form-erro" style="display:none;"></div>
+</div>
+
+<!-- LISTA DE ACESSOS CADASTRADOS -->
+<div class="panel">
+  <h2>Acessos cadastrados</h2>
+  <div id="listaAcessos" style="display:flex; flex-direction:column; gap:14px; margin-top:12px;"></div>
+  <div id="emptyAcessosMsg" class="empty" style="display:none;">Nenhum acesso cadastrado ainda.</div>
+</div>
+</div><!-- fim #abaIfood -->
+
+<!-- BACKUP -->
+<div class="panel">
+  <h2>Backup local</h2>
+  <div class="row">
+    <button onclick="exportBackup()">⬇ Baixar backup (JSON)</button>
+    <div class="file-input-wrap">
+      <button class="secondary">⬆ Importar backup</button>
+      <input type="file" id="importFile" accept="application/json" multiple onchange="importBackup(event)">
+    </div>
+    <button class="danger" onclick="limparTudo()">Apagar todos os dados</button>
+  </div>
+  <div id="backupInfo"></div>
+
+  <div class="auto-backup-box">
+    <label class="switch-label">
+      <input type="checkbox" id="autoBackupToggle">
+      Ativar backup automático de hora em hora
+    </label>
+    <div class="hint">Funciona somente enquanto esta página estiver aberta no navegador. A cada hora, os dados são salvos automaticamente.</div>
+    <div class="row" style="margin-top:8px;">
+      <button class="secondary" onclick="escolherArquivoBackupAutomatico()">📁 Escolher arquivo único (substitui a cada hora)</button>
+    </div>
+    <div id="autoBackupStatus" class="hint"></div>
+  </div>
+</div>
+
+<!-- MODAL CONFIRMAÇÃO -->
+<div id="confirmModal" class="modal-overlay confirm-overlay" style="display:none;" onclick="if(event.target===this) fecharConfirmModal();">
+  <div class="modal-box">
+    <h3>Confirmar ação</h3>
+    <div id="confirmModalMsg" style="font-size:.85rem;line-height:1.5;color:var(--text);"></div>
+    <div class="row" style="margin-top:14px;">
+      <button class="danger" id="confirmModalYes">Confirmar</button>
+      <button class="secondary" onclick="fecharConfirmModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO DE ALMOÇO -->
+<div id="editAlmocoModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalAlmoco();">
+  <div class="modal-box">
+    <h3>Editar lançamento de almoço</h3>
+    <div class="field">
+      <label>Colaborador</label>
+      <input type="text" id="editAlmocoNome">
+    </div>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="editAlmocoData">
+    </div>
+    <div class="field">
+      <label>Saída</label>
+      <input type="time" id="editAlmocoSaida">
+    </div>
+    <div class="field">
+      <label>Retorno (deixe em branco se ainda não voltou)</label>
+      <input type="time" id="editAlmocoRetorno">
+    </div>
+    <div class="field">
+      <label>Observação</label>
+      <input type="text" id="editAlmocoObs">
+    </div>
+    <div id="editAlmocoErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoAlmoco()">Salvar</button>
+      <button class="danger" onclick="excluirDoModalAlmoco()">Excluir</button>
+      <button class="secondary" onclick="fecharModalAlmoco()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO DE VAGAS -->
+<div id="editVagaModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalVaga();">
+  <div class="modal-box">
+    <h3>Editar vagas do dia</h3>
+    <div class="field">
+      <label>Data</label>
+      <input type="date" id="editVagaData">
+    </div>
+    <div class="field">
+      <label>Vagas orçadas</label>
+      <input type="number" id="editVagaOrcado" min="0">
+    </div>
+    <div class="field">
+      <label>Vagas preenchidas</label>
+      <input type="number" id="editVagaPreenchido" min="0">
+    </div>
+    <div class="field">
+      <label>Presença</label>
+      <input type="number" id="editVagaPresenca" min="0">
+    </div>
+    <div class="field">
+      <label>Em aberto</label>
+      <input type="number" id="editVagaEmAberto" min="0">
+    </div>
+    <div class="field">
+      <label>Faltas do dia</label>
+      <input type="number" id="editVagaFaltas" min="0">
+    </div>
+    <div class="field">
+      <label>Observação</label>
+      <input type="text" id="editVagaObs">
+    </div>
+    <div id="editVagaErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoVaga()">Salvar</button>
+      <button class="danger" onclick="excluirDoModalVaga()">Excluir</button>
+      <button class="secondary" onclick="fecharModalVaga()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIÇÃO DE OPERADOR (cadastro + entrada/saída) -->
+<div id="editOperadorModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalOperador();">
+  <div class="modal-box">
+    <h3>Editar operador</h3>
+    <div class="field">
+      <label>Nome</label>
+      <input type="text" id="editOperadorNome">
+    </div>
+    <div class="hint" id="editOperadorDataHint" style="margin:2px 0 10px;"></div>
+    <div class="field">
+      <label>Entrada</label>
+      <input type="time" id="editOperadorEntrada">
+    </div>
+    <div class="field">
+      <label>Saída (deixe em branco se ainda não saiu)</label>
+      <input type="time" id="editOperadorSaida">
+    </div>
+    <div id="editOperadorErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoOperador()">Salvar</button>
+      <button class="secondary" onclick="fecharModalOperador()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="editAcessoModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this) fecharModalAcesso();">
+  <div class="modal-box">
+    <h3>Editar acesso</h3>
+    <div class="field">
+      <label>Nome / descrição</label>
+      <input type="text" id="editAcessoNome">
+    </div>
+    <div class="field">
+      <label>Link</label>
+      <input type="text" id="editAcessoLink">
+    </div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="editAcessoUsuario">
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="text" id="editAcessoSenha">
+    </div>
+    <div id="editAcessoErro" class="form-erro" style="display:none;"></div>
+    <div class="row" style="margin-top:14px;">
+      <button onclick="salvarEdicaoAcesso()">Salvar</button>
+      <button class="danger" onclick="excluirDoModalAcesso()">Excluir</button>
+      <button class="secondary" onclick="fecharModalAcesso()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const STORAGE_KEY = 'helppi_registros';
+const LAST_BACKUP_KEY = 'helppi_last_backup';
+const ALMOCO_KEY = 'helppi_almoco_registros';
+const PRESENCA_LOJA_KEY = 'helppi_presenca_loja';
+const VAGAS_KEY = 'helppi_vagas_registros';
+
+// ---- FIREBASE (banco compartilhado do PAINEL: escala-dinamica) ----
+// sincronização em tempo real entre dispositivos
+const FB_CFG = {
+  apiKey: "AIzaSyD2qYaUrjyFoJgfNLRTBg-b2t9Yr9GSB3A",
+  authDomain: "escala-dinamica.firebaseapp.com",
+  databaseURL: "https://escala-dinamica-default-rtdb.firebaseio.com",
+  projectId: "escala-dinamica",
+  storageBucket: "escala-dinamica.firebasestorage.app",
+  messagingSenderId: "896362898729",
+  appId: "1:896362898729:web:443ef1f568fc709bf3c338"
+};
+const FB_PATH = 'controle_helppi';
+firebase.initializeApp(FB_CFG);
+const db = firebase.database();
+let _registrosCache = null;
+let _almocoCache = null;
+let _presencaLojaCache = null;
+let _vagasCache = null;
+let _produtividadeCache = null;
+let _acessosCache = null;
+let _totalHelppisCache = null;
+let cloudSyncOk = true;
+
+// Envia a lista inteira (registros ou almoco) para a nuvem. Silencioso em caso
+// de sucesso; avisa uma única vez se cair offline, e uma única vez ao voltar.
+async function pushToCloud(id, value){
+  try{
+    await db.ref(FB_PATH + '/' + id).set({ value, updated_at: new Date().toISOString() });
+    if(!cloudSyncOk){
+      cloudSyncOk = true;
+      showToast('✅ Conexão com a nuvem restabelecida. Dados sincronizados.');
+    }
+  }catch(err){
+    console.error('Falha ao sincronizar com a nuvem:', err);
+    if(cloudSyncOk){
+      cloudSyncOk = false;
+      showToast('⚠ Sem conexão com a nuvem agora. Salvando só neste dispositivo até a conexão voltar.');
+    }
+  }
+}
+
+// Carrega o estado atual da nuvem ao abrir a página (substitui o cache local
+// se a nuvem já tiver dados; caso contrário, envia o que existir localmente).
+async function carregarDadosNuvem(){
+  try{
+    const snap = await db.ref(FB_PATH).once('value');
+    const raw = snap.val() || {};
+    const map = {};
+    Object.keys(raw).forEach(k => { map[k] = raw[k] ? raw[k].value : undefined; });
+
+    if(map.registros !== undefined){
+      _registrosCache = map.registros || [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(_registrosCache));
+    }else{
+      await pushToCloud('registros', getRegistros());
+    }
+
+    if(map.almoco !== undefined){
+      _almocoCache = map.almoco || [];
+      localStorage.setItem(ALMOCO_KEY, JSON.stringify(_almocoCache));
+    }else{
+      await pushToCloud('almoco', getAlmocoRegistros());
+    }
+
+    if(map.presencaLoja !== undefined){
+      _presencaLojaCache = map.presencaLoja || { operadores: [], marcacoes: [] };
+      if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+      if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+      localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(_presencaLojaCache));
+    }else{
+      await pushToCloud('presencaLoja', getPresencaLoja());
+    }
+
+    if(map.vagas !== undefined){
+      _vagasCache = map.vagas || [];
+      localStorage.setItem(VAGAS_KEY, JSON.stringify(_vagasCache));
+    }else{
+      await pushToCloud('vagas', getVagasRegistros());
+    }
+
+    if(map.acessos !== undefined){
+      _acessosCache = map.acessos || [];
+      localStorage.setItem(ACESSOS_KEY, JSON.stringify(_acessosCache));
+    }else{
+      await pushToCloud('acessos', getAcessos());
+    }
+
+    if(map.totalHelppis !== undefined && Number.isFinite(map.totalHelppis) && map.totalHelppis >= 1){
+      _totalHelppisCache = map.totalHelppis;
+      localStorage.setItem(TOTAL_HELPPIS_KEY, String(_totalHelppisCache));
+    }else{
+      await pushToCloud('totalHelppis', getTotalHelppis());
+    }
+
+    if(map.produtividade !== undefined){
+      // mescla em vez de sobrescrever: se o usuário importou uma planilha localmente
+      // enquanto essa busca na nuvem ainda estava em andamento, isso evita apagar
+      // o que acabou de ser importado (só adiciona o que vier da nuvem e ainda não existe aqui)
+      const cloudList = map.produtividade || [];
+      const localList = getProdutividadePedidos();
+      const idsLocais = new Set(localList.map(p => p.pedidoId));
+      const novosDaCloud = cloudList.filter(p => !idsLocais.has(p.pedidoId));
+      _produtividadeCache = novosDaCloud.length ? localList.concat(novosDaCloud) : localList;
+      localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(_produtividadeCache));
+      if(_produtividadeCache.length > cloudList.length){
+        await pushToCloud('produtividade', _produtividadeCache);
+      }
+    }else{
+      await pushToCloud('produtividade', getProdutividadePedidos());
+    }
+
+    renderAll();
+    renderAlmocoTudo();
+    renderFiltroAlmocoColaborador();
+    renderListaPresencaRapido();
+    renderFiltroPresencaNome();
+    renderHistoricoPresenca();
+    renderVagasTudo();
+    renderProdutividade();
+    renderAcessos();
+    updateBackupInfo();
+    cloudSyncOk = true;
+  }catch(err){
+    console.error('Falha ao carregar dados da nuvem, usando dados locais:', err);
+    showToast('⚠ Não foi possível conectar à nuvem agora. Mostrando dados salvos neste dispositivo.');
+  }
+}
+
+// Mantém todos os dispositivos em sincronia: quando outra pessoa salva algo,
+// esta aba recebe o dado atualizado e re-renderiza automaticamente.
+function setupRealtime(){
+  db.ref(FB_PATH).on('child_changed', snap => {
+    handleRealtimeRow({ id: snap.key, value: snap.val() ? snap.val().value : undefined });
+  });
+}
+
+function handleRealtimeRow(row){
+      if(!row) return;
+
+      if(row.id === 'registros'){
+        _registrosCache = row.value || [];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(_registrosCache));
+        renderAll();
+        renderProdutividade();
+        updateBackupInfo();
+      }else if(row.id === 'almoco'){
+        _almocoCache = row.value || [];
+        localStorage.setItem(ALMOCO_KEY, JSON.stringify(_almocoCache));
+        renderAlmocoTudo();
+        renderFiltroAlmocoColaborador();
+        updateBackupInfo();
+      }else if(row.id === 'presencaLoja'){
+        _presencaLojaCache = row.value || { operadores: [], marcacoes: [] };
+        if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+        if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+        localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(_presencaLojaCache));
+        renderListaPresencaRapido();
+        renderFiltroPresencaNome();
+        renderHistoricoPresenca();
+        renderListaAlmocoRapido();
+        updateBackupInfo();
+      }else if(row.id === 'vagas'){
+        _vagasCache = row.value || [];
+        localStorage.setItem(VAGAS_KEY, JSON.stringify(_vagasCache));
+        renderVagasTudo();
+        updateBackupInfo();
+      }else if(row.id === 'acessos'){
+        _acessosCache = row.value || [];
+        localStorage.setItem(ACESSOS_KEY, JSON.stringify(_acessosCache));
+        renderAcessos();
+        updateBackupInfo();
+      }else if(row.id === 'totalHelppis'){
+        if(Number.isFinite(row.value) && row.value >= 1){
+          _totalHelppisCache = row.value;
+          localStorage.setItem(TOTAL_HELPPIS_KEY, String(_totalHelppisCache));
+        }
+      }else if(row.id === 'produtividade'){
+        // mescla em vez de sobrescrever: um eco da própria gravação (ou uma
+        // atualização atrasada/incompleta vinda da nuvem) nunca deve apagar
+        // pedidos que já estão salvos neste dispositivo
+        const incoming = Array.isArray(row.value) ? row.value : [];
+        const localList = getProdutividadePedidos();
+        const idsLocais = new Set(localList.map(p => p.pedidoId));
+        const novos = incoming.filter(p => p && p.pedidoId && !idsLocais.has(p.pedidoId));
+        if(novos.length){
+          _produtividadeCache = localList.concat(novos);
+          localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(_produtividadeCache));
+          renderProdutividade();
+        }
+        updateBackupInfo();
+      }
+}
+
+function todayStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = (d.getMonth()+1).toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function nowTimeStr(){
+  const d = new Date();
+  return d.toTimeString().slice(0,5);
+}
+function atualizarRelogio(){
+  const fHora = document.getElementById('fHora');
+  if(fHora) fHora.value = nowTimeStr();
+}
+function pad2(n){ return n.toString().padStart(2,'0'); }
+
+function escapeHtml(str){
+  if(str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+let toastTimeout = null;
+function showToast(msg, duracaoMs){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), duracaoMs || 5000);
+}
+
+// Confirmação própria (mais confiável que window.confirm em alguns navegadores/webviews)
+let confirmCallback = null;
+function pedirConfirmacao(msg, callback){
+  document.getElementById('confirmModalMsg').textContent = msg;
+  confirmCallback = callback;
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+function fecharConfirmModal(){
+  confirmCallback = null;
+  document.getElementById('confirmModal').style.display = 'none';
+}
+
+function getRegistros(){
+  if(_registrosCache !== null) return _registrosCache;
+  try{
+    _registrosCache = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  }catch(e){ _registrosCache = []; }
+  return _registrosCache;
+}
+function saveRegistros(list){
+  _registrosCache = list;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  pushToCloud('registros', list);
+}
+
+// ---- ALMOÇO ----
+function getAlmocoRegistros(){
+  if(_almocoCache !== null) return _almocoCache;
+  try{
+    _almocoCache = JSON.parse(localStorage.getItem(ALMOCO_KEY)) || [];
+  }catch(e){ _almocoCache = []; }
+  return _almocoCache;
+}
+function saveAlmocoRegistros(list){
+  _almocoCache = list;
+  localStorage.setItem(ALMOCO_KEY, JSON.stringify(list));
+  pushToCloud('almoco', list);
+}
+
+// ---- PRESENÇA NA LOJA (sem uso de Helppi) ----
+// Lista própria desta tela: { operadores: [{id,nome}], marcacoes: [{id,operadorId,data,hora}] }
+function getPresencaLoja(){
+  if(_presencaLojaCache !== null) return _presencaLojaCache;
+  try{
+    _presencaLojaCache = JSON.parse(localStorage.getItem(PRESENCA_LOJA_KEY)) || { operadores: [], marcacoes: [] };
+  }catch(e){ _presencaLojaCache = { operadores: [], marcacoes: [] }; }
+  if(!_presencaLojaCache.operadores) _presencaLojaCache.operadores = [];
+  if(!_presencaLojaCache.marcacoes) _presencaLojaCache.marcacoes = [];
+  return _presencaLojaCache;
+}
+function savePresencaLoja(dados){
+  _presencaLojaCache = dados;
+  localStorage.setItem(PRESENCA_LOJA_KEY, JSON.stringify(dados));
+  pushToCloud('presencaLoja', dados);
+}
+
+function adicionarOperadorPresenca(){
+  const input = document.getElementById('novoOperadorPresencaNome');
+  const nome = input.value.trim();
+  if(!nome){
+    showToast('Informe o nome do operador.');
+    return;
+  }
+  const dados = getPresencaLoja();
+  const jaExiste = dados.operadores.some(o => o.nome.trim().toLowerCase() === nome.toLowerCase());
+  if(jaExiste){
+    showToast('Esse operador já está na lista.');
+    input.value = '';
+    return;
+  }
+  dados.operadores.push({ id: 'op' + Date.now(), nome });
+  savePresencaLoja(dados);
+  input.value = '';
+  renderListaPresencaRapido();
+  renderFiltroPresencaNome();
+  renderHistoricoPresenca();
+  showToast(`"${nome}" adicionado à lista.`);
+}
+
+function statusPresencaNoDia(operadorId, data){
+  const dados = getPresencaLoja();
+  return dados.marcacoes.find(m => m.operadorId === operadorId && m.data === data) || null;
+}
+
+function marcarPresencaRapida(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const existente = statusPresencaNoDia(operadorId, data);
+  if(existente){
+    showToast(`Presença de "${nome}" já estava marcada em ${formatDate(data)}.`);
+    return;
+  }
+  dados.marcacoes.push({
+    id: 'pm' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    operadorId, data, hora: nowTimeStr()
+  });
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  renderHistoricoPresenca();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  showToast(`Presença marcada: ${nome} em ${formatDate(data)}.`);
+}
+
+function desmarcarPresenca(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  dados.marcacoes = dados.marcacoes.filter(m => !(m.operadorId === operadorId && m.data === data));
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  renderHistoricoPresenca();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  showToast(`Presença de "${nome}" desmarcada em ${formatDate(data)}.`);
+}
+
+function marcarSaidaOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  dados.marcacoes[idx].horaSaida = nowTimeStr();
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  renderHistoricoPresenca();
+  showToast(`Saída registrada: ${nome} às ${dados.marcacoes[idx].horaSaida}.`);
+}
+
+function desfazerSaidaOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  delete dados.marcacoes[idx].horaSaida;
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  renderHistoricoPresenca();
+  showToast(`Saída desfeita: ${nome} está presente novamente.`);
+}
+
+function toggleDobraOperador(operadorId, nome){
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const idx = dados.marcacoes.findIndex(m => m.operadorId === operadorId && m.data === data);
+  if(idx === -1) return;
+  dados.marcacoes[idx].dobra = !dados.marcacoes[idx].dobra;
+  savePresencaLoja(dados);
+  renderListaPresencaRapido();
+  renderHistoricoPresenca();
+  showToast(dados.marcacoes[idx].dobra
+    ? `Dobra marcada: ${nome}.`
+    : `Marcação de dobra removida: ${nome}.`);
+}
+
+function removerOperadorPresenca(operadorId, nome){
+  pedirConfirmacao(`Remover "${nome}" da lista de operadores? (não apaga presenças já marcadas)`, () => {
+    const dados = getPresencaLoja();
+    dados.operadores = dados.operadores.filter(o => o.id !== operadorId);
+    savePresencaLoja(dados);
+    renderListaPresencaRapido();
+    renderFiltroPresencaNome();
+    renderHistoricoPresenca();
+  });
+}
+
+// ---- EDIÇÃO DE OPERADOR (cadastro + entrada/saída no dia selecionado) ----
+let editandoOperadorId = null;
+
+function abrirEdicaoOperador(operadorId){
+  const dados = getPresencaLoja();
+  const op = dados.operadores.find(o => o.id === operadorId);
+  if(!op) return;
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const marcacao = statusPresencaNoDia(operadorId, data);
+
+  editandoOperadorId = operadorId;
+  document.getElementById('editOperadorNome').value = op.nome;
+  document.getElementById('editOperadorDataHint').textContent = 'Horários referentes ao dia ' + formatDate(data) + '.';
+  document.getElementById('editOperadorEntrada').value = marcacao ? marcacao.hora : '';
+  document.getElementById('editOperadorSaida').value = marcacao && marcacao.horaSaida ? marcacao.horaSaida : '';
+  document.getElementById('editOperadorErro').style.display = 'none';
+  document.getElementById('editOperadorModal').style.display = 'flex';
+}
+
+function fecharModalOperador(){
+  editandoOperadorId = null;
+  document.getElementById('editOperadorModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoOperador(msg){
+  const el = document.getElementById('editOperadorErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoOperador(){
+  if(!editandoOperadorId) return;
+
+  const nome = document.getElementById('editOperadorNome').value.trim();
+  const entrada = document.getElementById('editOperadorEntrada').value;
+  const saida = document.getElementById('editOperadorSaida').value;
+
+  if(!nome){
+    mostrarErroEdicaoOperador('Informe o nome do operador.');
+    return;
+  }
+  if(saida && !entrada){
+    mostrarErroEdicaoOperador('Informe o horário de entrada antes do de saída.');
+    return;
+  }
+  if(entrada && saida && saida < entrada){
+    mostrarErroEdicaoOperador('O horário de saída não pode ser antes da entrada.');
+    return;
+  }
+
+  const dados = getPresencaLoja();
+  const opIdx = dados.operadores.findIndex(o => o.id === editandoOperadorId);
+  if(opIdx === -1) return;
+
+  const nomeDuplicado = dados.operadores.some((o,i) => i !== opIdx && o.nome.trim().toLowerCase() === nome.toLowerCase());
+  if(nomeDuplicado){
+    mostrarErroEdicaoOperador('Já existe outro operador com esse nome.');
+    return;
+  }
+  dados.operadores[opIdx].nome = nome;
+
+  const data = document.getElementById('presencaLojaData').value || todayStr();
+  const mIdx = dados.marcacoes.findIndex(m => m.operadorId === editandoOperadorId && m.data === data);
+
+  if(entrada){
+    if(mIdx === -1){
+      dados.marcacoes.push({
+        id: 'pm' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        operadorId: editandoOperadorId, data, hora: entrada
+      });
+    }else{
+      dados.marcacoes[mIdx].hora = entrada;
+    }
+    const idxFinal = mIdx === -1 ? dados.marcacoes.length - 1 : mIdx;
+    if(saida){
+      dados.marcacoes[idxFinal].horaSaida = saida;
+    }else{
+      delete dados.marcacoes[idxFinal].horaSaida;
+    }
+  }else if(mIdx !== -1){
+    dados.marcacoes.splice(mIdx, 1);
+  }
+
+  savePresencaLoja(dados);
+  fecharModalOperador();
+  renderListaPresencaRapido();
+  renderFiltroPresencaNome();
+  renderHistoricoPresenca();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  showToast(`Cadastro de "${nome}" atualizado.`);
+}
+
+function renderListaPresencaRapido(){
+  const dataSel = document.getElementById('presencaLojaData').value || todayStr();
+  const dados = getPresencaLoja();
+  const container = document.getElementById('listaPresencaRapido');
+  container.innerHTML = '';
+
+  document.getElementById('statTotalOperadores').textContent = dados.operadores.length;
+  document.getElementById('statTrabalhandoHoje').textContent =
+    dados.marcacoes.filter(m => m.data === dataSel).length;
+
+  if(!dados.operadores.length){
+    container.innerHTML = '<div class="hint">Nenhum operador adicionado ainda. Use o campo acima.</div>';
+    return;
+  }
+
+  const termoBusca = (document.getElementById('buscaOperadorPresenca').value || '').trim().toLowerCase();
+  let operadoresOrdenados = [...dados.operadores].sort((a,b) => a.nome.localeCompare(b.nome, 'pt'));
+  if(termoBusca){
+    operadoresOrdenados = operadoresOrdenados.filter(o => o.nome.toLowerCase().includes(termoBusca));
+  }
+
+  if(!operadoresOrdenados.length){
+    container.innerHTML = '<div class="hint">Nenhum operador encontrado para essa busca.</div>';
+    return;
+  }
+
+  operadoresOrdenados.forEach(op => {
+    const marcacao = statusPresencaNoDia(op.id, dataSel);
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (marcacao ? 'almoco-feito' : 'livre');
+
+    let statusTxt = 'Ainda não marcado';
+    if(marcacao){
+      statusTxt = '✅ Presente às ' + marcacao.hora;
+      if(marcacao.horaSaida) statusTxt += ' · Saída às ' + marcacao.horaSaida;
+    }
+
+    cell.innerHTML = `
+      <div class="num almoco-quick-nome">${escapeHtml(op.nome)} ${marcacao && marcacao.dobra ? '<span class="dobra-badge">🔁 Dobra</span>' : ''}</div>
+      <div class="op almoco-quick-status">${statusTxt}</div>
+    `;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'helppi-quick-actions';
+
+    if(!marcacao){
+      const btn = document.createElement('button');
+      btn.className = 'mini-btn';
+      btn.textContent = 'Marcar presença';
+      btn.onclick = () => marcarPresencaRapida(op.id, op.nome);
+      wrapper.appendChild(btn);
+    }else{
+      const btnDobra = document.createElement('button');
+      btnDobra.className = 'mini-btn' + (marcacao.dobra ? ' active' : '');
+      btnDobra.textContent = marcacao.dobra ? '🔁 Dobra' : 'Dobra';
+      btnDobra.onclick = () => toggleDobraOperador(op.id, op.nome);
+      wrapper.appendChild(btnDobra);
+
+      const btnSaida = document.createElement('button');
+      btnSaida.className = 'mini-btn' + (marcacao.horaSaida ? '' : ' saida');
+      btnSaida.textContent = marcacao.horaSaida ? 'Desfazer saída' : 'Saída';
+      btnSaida.onclick = () => marcacao.horaSaida ? desfazerSaidaOperador(op.id, op.nome) : marcarSaidaOperador(op.id, op.nome);
+      wrapper.appendChild(btnSaida);
+
+      const btnDesmarcar = document.createElement('button');
+      btnDesmarcar.className = 'mini-btn';
+      btnDesmarcar.style.opacity = '0.7';
+      btnDesmarcar.textContent = 'Desmarcar';
+      btnDesmarcar.onclick = () => desmarcarPresenca(op.id, op.nome);
+      wrapper.appendChild(btnDesmarcar);
+    }
+
+    const btnEditar = document.createElement('button');
+    btnEditar.className = 'mini-btn';
+    btnEditar.textContent = '✎ Editar';
+    btnEditar.title = 'Editar cadastro e horário de entrada/saída';
+    btnEditar.onclick = () => abrirEdicaoOperador(op.id);
+    wrapper.appendChild(btnEditar);
+
+    const btnRemover = document.createElement('button');
+    btnRemover.className = 'mini-btn';
+    btnRemover.style.opacity = '0.6';
+    btnRemover.textContent = '✕';
+    btnRemover.title = 'Remover operador da lista';
+    btnRemover.onclick = () => removerOperadorPresenca(op.id, op.nome);
+    wrapper.appendChild(btnRemover);
+
+    cell.appendChild(wrapper);
+    container.appendChild(cell);
+  });
+}
+
+function renderFiltroPresencaNome(){
+  const select = document.getElementById('filtroPresencaNome');
+  const valorAnterior = select.value;
+  const dados = getPresencaLoja();
+  const nomes = [...dados.operadores].sort((a,b) => a.nome.localeCompare(b.nome, 'pt'));
+
+  select.innerHTML = '<option value="">Todos</option>';
+  nomes.forEach(op => {
+    const opt = document.createElement('option');
+    opt.value = op.id; opt.textContent = op.nome;
+    select.appendChild(opt);
+  });
+  if(nomes.some(op => op.id === valorAnterior)) select.value = valorAnterior;
+}
+
+function limparFiltroPresenca(){
+  document.getElementById('filtroPresencaData').value = '';
+  document.getElementById('filtroPresencaNome').value = '';
+  renderHistoricoPresenca();
+}
+
+function renderHistoricoPresenca(){
+  const dataFiltro = document.getElementById('filtroPresencaData').value;
+  const operadorFiltro = document.getElementById('filtroPresencaNome').value;
+
+  const wrap = document.getElementById('wrapHistoricoPresenca');
+  const msgSelecione = document.getElementById('selecioneDataHistoricoMsg');
+
+  if(!dataFiltro){
+    wrap.style.display = 'none';
+    document.getElementById('emptyHistoricoPresencaMsg').style.display = 'none';
+    msgSelecione.style.display = 'block';
+    return;
+  }
+  msgSelecione.style.display = 'none';
+  wrap.style.display = 'block';
+
+  const dados = getPresencaLoja();
+  const nomesPorId = {};
+  dados.operadores.forEach(op => { nomesPorId[op.id] = op.nome; });
+
+  let lista = dados.marcacoes.map(m => ({
+    ...m,
+    nome: nomesPorId[m.operadorId] || '(operador removido)'
+  }));
+
+  lista = lista.filter(m => m.data === dataFiltro);
+  if(operadorFiltro) lista = lista.filter(m => m.operadorId === operadorFiltro);
+
+  lista.sort((a,b) => (b.data + (b.hora||'')).localeCompare(a.data + (a.hora||'')));
+
+  const tbody = document.getElementById('tbodyHistoricoPresenca');
+  tbody.innerHTML = '';
+  document.getElementById('emptyHistoricoPresencaMsg').style.display = lista.length ? 'none' : 'block';
+  if(!lista.length) wrap.style.display = 'none';
+
+  lista.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(m.nome)}</td>
+      <td>${formatDate(m.data)}</td>
+      <td>${m.hora || '—'}</td>
+      <td>${m.horaSaida || '—'}</td>
+      <td>${m.dobra ? '🔁 Sim' : '—'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- VAGAS ----
+function getVagasRegistros(){
+  if(_vagasCache !== null) return _vagasCache;
+  try{
+    _vagasCache = JSON.parse(localStorage.getItem(VAGAS_KEY)) || [];
+  }catch(e){ _vagasCache = []; }
+  return _vagasCache;
+}
+function saveVagasRegistros(list){
+  _vagasCache = list;
+  localStorage.setItem(VAGAS_KEY, JSON.stringify(list));
+  pushToCloud('vagas', list);
+}
+
+// ---- ABAS ----
+function mudarAba(nome){
+  const abaHelppis = document.getElementById('abaHelppis');
+  const abaAlmoco = document.getElementById('abaAlmoco');
+  const abaVagas = document.getElementById('abaVagas');
+  const abaProdutividade = document.getElementById('abaProdutividade');
+  const abaIfood = document.getElementById('abaIfood');
+  const btnHelppis = document.getElementById('tabBtnHelppis');
+  const btnAlmoco = document.getElementById('tabBtnAlmoco');
+  const btnVagas = document.getElementById('tabBtnVagas');
+  const btnProdutividade = document.getElementById('tabBtnProdutividade');
+  const btnIfood = document.getElementById('tabBtnIfood');
+
+  abaHelppis.style.display = 'none';
+  abaAlmoco.style.display = 'none';
+  abaVagas.style.display = 'none';
+  abaProdutividade.style.display = 'none';
+  abaIfood.style.display = 'none';
+  btnHelppis.classList.remove('active');
+  btnAlmoco.classList.remove('active');
+  btnVagas.classList.remove('active');
+  btnProdutividade.classList.remove('active');
+  btnIfood.classList.remove('active');
+
+  if(nome === 'almoco'){
+    abaAlmoco.style.display = 'block';
+    btnAlmoco.classList.add('active');
+    renderAlmocoTudo();
+  }else if(nome === 'vagas'){
+    abaVagas.style.display = 'block';
+    btnVagas.classList.add('active');
+    renderVagasTudo();
+    atualizarVagaPresencaAutomatica();
+  }else if(nome === 'produtividade'){
+    abaProdutividade.style.display = 'block';
+    btnProdutividade.classList.add('active');
+    renderProdutividade();
+  }else if(nome === 'ifood'){
+    abaIfood.style.display = 'block';
+    btnIfood.classList.add('active');
+    renderAcessos();
+  }else{
+    abaHelppis.style.display = 'block';
+    btnHelppis.classList.add('active');
+  }
+}
+
+// populate helppi selects (01..50)
+// ---- QUANTIDADE DE TERMINAIS HELPPI (expansível além do 50) ----
+function getTotalHelppis(){
+  if(_totalHelppisCache !== null) return _totalHelppisCache;
+  const salvo = parseInt(localStorage.getItem(TOTAL_HELPPIS_KEY), 10);
+  _totalHelppisCache = (Number.isFinite(salvo) && salvo >= 1) ? salvo : 50;
+  return _totalHelppisCache;
+}
+function saveTotalHelppis(n){
+  _totalHelppisCache = n;
+  localStorage.setItem(TOTAL_HELPPIS_KEY, String(n));
+  pushToCloud('totalHelppis', n);
+}
+
+function formatDate(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function renderAll(){
+  updateBackupInfo();
+}
+
+function renderAlmocoTudo(){
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+}
+
+// Preenche o filtro "Filtrar por colaborador" do histórico com os nomes que
+// já têm algum lançamento de almoço (não depende de cadastro manual).
+function renderFiltroAlmocoColaborador(){
+  const selectFiltro = document.getElementById('filtroAlmocoColaborador');
+  const valorSelecionado = selectFiltro.value;
+
+  const nomes = [...new Set(getAlmocoRegistros().map(r => r.colaboradorNome))]
+    .sort((a,b) => a.localeCompare(b, 'pt-BR'));
+
+  selectFiltro.innerHTML = '<option value="">Todos</option>';
+  nomes.forEach(nome => {
+    const opt = document.createElement('option');
+    opt.value = nome; opt.textContent = nome;
+    selectFiltro.appendChild(opt);
+  });
+
+  if(nomes.includes(valorSelecionado)) selectFiltro.value = valorSelecionado;
+}
+
+// ---- LANÇAMENTO RÁPIDO DE ALMOÇO (um clique, sem seleção) ----
+
+// Retorna o status do almoço de hoje para um colaborador:
+// 'nenhum' (ainda não saiu), 'aberto' (saiu, aguardando retorno) ou 'completo' (saiu e voltou)
+function statusAlmocoHoje(nome){
+  const hoje = todayStr();
+  const registros = getAlmocoRegistros()
+    .filter(r => r.data === hoje && r.colaboradorNome === nome)
+    .sort((a,b) => (a.saida || '').localeCompare(b.saida || ''));
+
+  const aberto = registros.find(r => r.saida && !r.retorno);
+
+  return { tipo: aberto ? 'aberto' : (registros.length ? 'completo' : 'nenhum'), aberto, todos: registros };
+}
+
+// Retorna, em ordem alfabética, os nomes distintos de operadores que têm
+// lançamento de Helppi na data de hoje (só quem está trabalhando hoje).
+function obterOperadoresDeHoje(){
+  const hoje = todayStr();
+
+  // colaboradores marcados como presentes hoje entram na lista, valendo
+  // as mesmas regras: almoço, entrada/saída etc.
+  const dadosPresenca = getPresencaLoja();
+  const idsMarcadosHoje = new Set(
+    dadosPresenca.marcacoes.filter(m => m.data === hoje).map(m => m.operadorId)
+  );
+  const nomes = dadosPresenca.operadores
+    .filter(op => idsMarcadosHoje.has(op.id))
+    .map(op => (op.nome || '').trim())
+    .filter(Boolean);
+
+  return [...new Set(nomes)].sort((a,b) => a.localeCompare(b, 'pt-BR'));
+}
+
+function renderListaAlmocoRapido(){
+  document.getElementById('almocoHojeLabel').textContent = formatDate(todayStr());
+
+  const operadoresHoje = obterOperadoresDeHoje();
+  const container = document.getElementById('listaAlmocoRapido');
+  container.innerHTML = '';
+
+  if(!operadoresHoje.length){
+    container.innerHTML = '<div class="hint">Nenhum operador lançado hoje na aba Helppis ainda.</div>';
+    document.getElementById('statEmAlmoco').textContent = 0;
+    document.getElementById('statTrabalhando').textContent = 0;
+    return;
+  }
+
+  let emAlmoco = 0;
+
+  operadoresHoje.forEach(nome => {
+    const status = statusAlmocoHoje(nome);
+
+    let statusTexto, botaoTexto, acao, emAndamento;
+
+    if(!status.todos.length){
+      statusTexto = 'Ainda não saiu para o almoço';
+      botaoTexto = 'Registrar saída';
+      emAndamento = false;
+      acao = () => registrarSaidaRapida(nome);
+    }else{
+      // monta o status com TODOS os intervalos do dia, numerando quando houver
+      // mais de um, para nunca "perder" o primeiro intervalo quando um segundo
+      // for iniciado.
+      const partes = status.todos.map((r, idx) => {
+        const rotulo = status.todos.length > 1 ? `Intervalo ${idx+1}: ` : '';
+        return r.retorno
+          ? `${rotulo}${r.saida} – ${r.retorno}`
+          : `${rotulo}${r.saida} (em andamento)`;
+      });
+      statusTexto = partes.join(' · ');
+
+      if(status.tipo === 'aberto'){
+        botaoTexto = 'Registrar retorno';
+        emAndamento = true;
+        acao = () => registrarRetornoRapido(status.aberto.id);
+      }else{
+        botaoTexto = 'Novo intervalo';
+        emAndamento = false;
+        acao = () => registrarSaidaRapida(nome);
+      }
+    }
+
+    if(emAndamento) emAlmoco++;
+
+    // mesma linguagem visual da tela de Helppis: verde = ainda não saiu,
+    // vermelho = em almoço agora, azul = já foi e voltou do intervalo
+    let corCell;
+    if(emAndamento) corCell = 'ocupada';
+    else if(status.tipo === 'completo') corCell = 'almoco-feito';
+    else corCell = 'livre';
+
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + corCell;
+    cell.innerHTML = `
+      <div class="num almoco-quick-nome">${escapeHtml(nome)}</div>
+      <div class="op almoco-quick-status">${statusTexto}</div>
+    `;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'helppi-quick-actions';
+    const btn = document.createElement('button');
+    btn.className = 'mini-btn' + (emAndamento ? ' saida' : '');
+    btn.textContent = botaoTexto;
+    btn.onclick = acao;
+    wrapper.appendChild(btn);
+    cell.appendChild(wrapper);
+
+    container.appendChild(cell);
+  });
+
+  document.getElementById('statEmAlmoco').textContent = emAlmoco;
+  document.getElementById('statTrabalhando').textContent = operadoresHoje.length - emAlmoco;
+}
+
+function registrarSaidaRapida(nome){
+  const lista = getAlmocoRegistros();
+  const hora = nowTimeStr();
+  lista.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    colaboradorNome: nome,
+    data: todayStr(),
+    saida: hora,
+    retorno: '',
+    obs: ''
+  });
+  saveAlmocoRegistros(lista);
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+  showToast(`Saída para almoço registrada: ${nome} às ${hora}.`);
+}
+
+function registrarRetornoRapido(id){
+  const lista = getAlmocoRegistros();
+  const idx = lista.findIndex(r => r.id === id);
+  if(idx === -1) return;
+
+  const hora = nowTimeStr();
+  lista[idx].retorno = hora;
+  saveAlmocoRegistros(lista);
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+  showToast(`Retorno do almoço registrado: ${lista[idx].colaboradorNome} às ${hora}.`);
+}
+
+function excluirAlmoco(id){
+  pedirConfirmacao('Excluir este lançamento de almoço?', () => {
+    const lista = getAlmocoRegistros().filter(r => r.id !== id);
+    saveAlmocoRegistros(lista);
+    renderListaAlmocoRapido();
+    renderFiltroAlmocoColaborador();
+    renderTabelaAlmoco();
+  });
+}
+
+// ---- EDIÇÃO DE LANÇAMENTO DE ALMOÇO ----
+let editandoAlmocoId = null;
+
+function abrirEdicaoAlmoco(id){
+  const reg = getAlmocoRegistros().find(r => r.id === id);
+  if(!reg) return;
+
+  editandoAlmocoId = id;
+  document.getElementById('editAlmocoNome').value = reg.colaboradorNome;
+  document.getElementById('editAlmocoData').value = reg.data;
+  document.getElementById('editAlmocoSaida').value = reg.saida || '';
+  document.getElementById('editAlmocoRetorno').value = reg.retorno || '';
+  document.getElementById('editAlmocoObs').value = reg.obs || '';
+  document.getElementById('editAlmocoErro').style.display = 'none';
+  document.getElementById('editAlmocoModal').style.display = 'flex';
+}
+
+function fecharModalAlmoco(){
+  editandoAlmocoId = null;
+  document.getElementById('editAlmocoModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoAlmoco(msg){
+  const el = document.getElementById('editAlmocoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoAlmoco(){
+  if(!editandoAlmocoId) return;
+
+  const colaboradorNome = document.getElementById('editAlmocoNome').value.trim();
+  const data = document.getElementById('editAlmocoData').value;
+  const saida = document.getElementById('editAlmocoSaida').value;
+  const retorno = document.getElementById('editAlmocoRetorno').value;
+  const obs = document.getElementById('editAlmocoObs').value.trim();
+
+  if(!colaboradorNome){
+    mostrarErroEdicaoAlmoco('Informe o nome do colaborador.');
+    return;
+  }
+  if(!data || !saida){
+    mostrarErroEdicaoAlmoco('Informe data e horário de saída.');
+    return;
+  }
+  if(retorno && retorno < saida){
+    mostrarErroEdicaoAlmoco('O horário de retorno não pode ser antes da saída.');
+    return;
+  }
+
+  const lista = getAlmocoRegistros();
+  const idx = lista.findIndex(r => r.id === editandoAlmocoId);
+  if(idx === -1) return;
+
+  lista[idx] = { ...lista[idx], colaboradorNome, data, saida, retorno, obs };
+  saveAlmocoRegistros(lista);
+  fecharModalAlmoco();
+  renderListaAlmocoRapido();
+  renderFiltroAlmocoColaborador();
+  renderTabelaAlmoco();
+}
+
+function excluirDoModalAlmoco(){
+  if(!editandoAlmocoId) return;
+  const idParaExcluir = editandoAlmocoId;
+
+  pedirConfirmacao('Excluir este lançamento de almoço?', () => {
+    const lista = getAlmocoRegistros().filter(r => r.id !== idParaExcluir);
+    saveAlmocoRegistros(lista);
+    fecharModalAlmoco();
+    renderListaAlmocoRapido();
+    renderFiltroAlmocoColaborador();
+    renderTabelaAlmoco();
+  });
+}
+
+function calcularDuracao(saida, retorno){
+  if(!saida || !retorno) return '—';
+  const [h1,m1] = saida.split(':').map(Number);
+  const [h2,m2] = retorno.split(':').map(Number);
+  let minutos = (h2*60+m2) - (h1*60+m1);
+  if(minutos < 0) minutos += 24*60; // cobre o caso raro de intervalo virando a meia-noite
+  const h = Math.floor(minutos/60);
+  const m = minutos % 60;
+  return h > 0 ? `${h}h ${m.toString().padStart(2,'0')}min` : `${m}min`;
+}
+
+function limparFiltroAlmoco(){
+  document.getElementById('filtroAlmocoData').value = '';
+  document.getElementById('filtroAlmocoColaborador').value = '';
+  renderTabelaAlmoco();
+}
+
+function renderTabelaAlmoco(){
+  const dataFiltro = document.getElementById('filtroAlmocoData').value;
+  const colaboradorFiltro = document.getElementById('filtroAlmocoColaborador').value;
+
+  let lista = getAlmocoRegistros();
+  if(dataFiltro) lista = lista.filter(r => r.data === dataFiltro);
+  if(colaboradorFiltro) lista = lista.filter(r => r.colaboradorNome === colaboradorFiltro);
+
+  lista.sort((a,b) => (b.data+(b.saida||'')).localeCompare(a.data+(a.saida||'')));
+
+  const tbody = document.getElementById('tbodyAlmoco');
+  tbody.innerHTML = '';
+  document.getElementById('emptyAlmocoMsg').style.display = lista.length ? 'none' : 'block';
+
+  lista.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.colaboradorNome)}</td>
+      <td>${formatDate(r.data)}</td>
+      <td>${r.saida || '—'}</td>
+      <td>${r.retorno || '—'}</td>
+      <td>${calcularDuracao(r.saida, r.retorno)}</td>
+      <td>${escapeHtml(r.obs) || '—'}</td>
+      <td>
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicaoAlmoco('${r.id}')">Editar</button>
+        <button class="del-btn" onclick="excluirAlmoco('${r.id}')">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- VAGAS (orçadas / preenchidas / faltas por dia) ----
+
+function mostrarErroFormVaga(msg){
+  const el = document.getElementById('formVagaErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function esconderErroFormVaga(){
+  document.getElementById('formVagaErro').style.display = 'none';
+}
+
+// Sempre cria um lançamento novo (nunca sobrescreve um registro existente).
+function atualizarVagaPresencaAutomatica(){
+  const data = document.getElementById('fVagaData').value;
+  const campo = document.getElementById('fVagaPresenca');
+  if(!data){
+    campo.value = '';
+    return;
+  }
+  // "presença" = quantidade de operadores distintos marcados presentes nessa data
+  const dadosPresenca = getPresencaLoja();
+  const idsMarcados = new Set(
+    dadosPresenca.marcacoes.filter(m => m.data === data).map(m => m.operadorId)
+  );
+  campo.value = idsMarcados.size;
+}
+
+function addVaga(){
+  esconderErroFormVaga();
+
+  const data = document.getElementById('fVagaData').value;
+  const orcado = document.getElementById('fVagaOrcado').value;
+  const preenchido = document.getElementById('fVagaPreenchido').value;
+  const presenca = document.getElementById('fVagaPresenca').value;
+  const emAberto = document.getElementById('fVagaEmAberto').value;
+  const faltas = document.getElementById('fVagaFaltas').value;
+  const obs = document.getElementById('fVagaObs').value.trim();
+
+  if(!data){
+    mostrarErroFormVaga('Informe a data.');
+    return;
+  }
+  if(orcado === '' || preenchido === ''){
+    mostrarErroFormVaga('Preencha vagas orçadas e preenchidas (use 0 se não houver).');
+    return;
+  }
+
+  const lista = getVagasRegistros();
+  const registro = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    data,
+    orcado: Number(orcado) || 0,
+    preenchido: Number(preenchido) || 0,
+    presenca: presenca === '' ? null : Number(presenca) || 0,
+    emAberto: emAberto === '' ? null : Number(emAberto) || 0,
+    faltas: Number(faltas) || 0,
+    obs
+  };
+
+  lista.push(registro);
+  const msg = `Vagas de ${formatDate(data)} lançadas.`;
+  saveVagasRegistros(lista);
+
+  document.getElementById('fVagaOrcado').value = '';
+  document.getElementById('fVagaPreenchido').value = '';
+  document.getElementById('fVagaEmAberto').value = '';
+  document.getElementById('fVagaFaltas').value = '';
+  document.getElementById('fVagaObs').value = '';
+  atualizarVagaPresencaAutomatica();
+
+  renderVagasTudo();
+  showToast(msg);
+}
+
+function excluirVaga(id){
+  pedirConfirmacao('Excluir este registro de vagas?', () => {
+    const lista = getVagasRegistros().filter(r => r.id !== id);
+    saveVagasRegistros(lista);
+    renderVagasTudo();
+  });
+}
+
+// ---- EDIÇÃO DE VAGAS ----
+let editandoVagaId = null;
+
+function abrirEdicaoVaga(id){
+  const reg = getVagasRegistros().find(r => r.id === id);
+  if(!reg) return;
+
+  editandoVagaId = id;
+  document.getElementById('editVagaData').value = reg.data;
+  document.getElementById('editVagaOrcado').value = reg.orcado;
+  document.getElementById('editVagaPreenchido').value = reg.preenchido;
+  document.getElementById('editVagaPresenca').value = reg.presenca === null || reg.presenca === undefined ? '' : reg.presenca;
+  document.getElementById('editVagaEmAberto').value = reg.emAberto === null || reg.emAberto === undefined ? '' : reg.emAberto;
+  document.getElementById('editVagaFaltas').value = reg.faltas || 0;
+  document.getElementById('editVagaObs').value = reg.obs || '';
+  document.getElementById('editVagaErro').style.display = 'none';
+  document.getElementById('editVagaModal').style.display = 'flex';
+}
+
+function fecharModalVaga(){
+  editandoVagaId = null;
+  document.getElementById('editVagaModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoVaga(msg){
+  const el = document.getElementById('editVagaErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoVaga(){
+  if(!editandoVagaId) return;
+
+  const data = document.getElementById('editVagaData').value;
+  const orcado = document.getElementById('editVagaOrcado').value;
+  const preenchido = document.getElementById('editVagaPreenchido').value;
+  const presenca = document.getElementById('editVagaPresenca').value;
+  const emAberto = document.getElementById('editVagaEmAberto').value;
+  const faltas = document.getElementById('editVagaFaltas').value;
+  const obs = document.getElementById('editVagaObs').value.trim();
+
+  if(!data){
+    mostrarErroEdicaoVaga('Informe a data.');
+    return;
+  }
+  if(orcado === '' || preenchido === ''){
+    mostrarErroEdicaoVaga('Preencha vagas orçadas e preenchidas (use 0 se não houver).');
+    return;
+  }
+
+  const lista = getVagasRegistros();
+  const idx = lista.findIndex(r => r.id === editandoVagaId);
+  if(idx === -1) return;
+
+  lista[idx] = {
+    ...lista[idx],
+    data,
+    orcado: Number(orcado)||0,
+    preenchido: Number(preenchido)||0,
+    presenca: presenca === '' ? null : Number(presenca) || 0,
+    emAberto: emAberto === '' ? null : Number(emAberto) || 0,
+    faltas: Number(faltas)||0,
+    obs
+  };
+  saveVagasRegistros(lista);
+  fecharModalVaga();
+  renderVagasTudo();
+}
+
+function excluirDoModalVaga(){
+  if(!editandoVagaId) return;
+  const idParaExcluir = editandoVagaId;
+
+  pedirConfirmacao('Excluir este registro de vagas?', () => {
+    const lista = getVagasRegistros().filter(r => r.id !== idParaExcluir);
+    saveVagasRegistros(lista);
+    fecharModalVaga();
+    renderVagasTudo();
+  });
+}
+
+// ---- ACESSOS (cadastro de logins/sistemas para operadores) ----
+function getAcessos(){
+  if(_acessosCache !== null) return _acessosCache;
+  try{
+    _acessosCache = JSON.parse(localStorage.getItem(ACESSOS_KEY)) || [];
+  }catch(e){ _acessosCache = []; }
+  return _acessosCache;
+}
+function saveAcessos(list){
+  _acessosCache = list;
+  localStorage.setItem(ACESSOS_KEY, JSON.stringify(list));
+  pushToCloud('acessos', list);
+}
+
+function mostrarErroAcesso(msg){
+  const el = document.getElementById('acessoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+function esconderErroAcesso(){
+  document.getElementById('acessoErro').style.display = 'none';
+}
+
+function addAcesso(){
+  esconderErroAcesso();
+
+  const nome = document.getElementById('fAcessoNome').value.trim();
+  const link = document.getElementById('fAcessoLink').value.trim();
+  const usuario = document.getElementById('fAcessoUsuario').value.trim();
+  const senha = document.getElementById('fAcessoSenha').value.trim();
+
+  if(!nome || !link){
+    mostrarErroAcesso('Preencha ao menos o nome e o link.');
+    return;
+  }
+
+  const lista = getAcessos();
+  lista.push({
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    nome, link, usuario, senha
+  });
+  saveAcessos(lista);
+
+  document.getElementById('fAcessoNome').value = '';
+  document.getElementById('fAcessoLink').value = '';
+  document.getElementById('fAcessoUsuario').value = '';
+  document.getElementById('fAcessoSenha').value = '';
+
+  renderAcessos();
+  showToast('Acesso cadastrado.');
+}
+
+function renderAcessos(){
+  const lista = getAcessos();
+  const container = document.getElementById('listaAcessos');
+  const emptyMsg = document.getElementById('emptyAcessosMsg');
+
+  container.innerHTML = '';
+  emptyMsg.style.display = lista.length ? 'none' : 'block';
+
+  lista.forEach(a => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;';
+    card.innerHTML = `
+      <div style="background:#fff; padding:8px; border-radius:8px; width:96px; height:96px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+        <canvas id="acessoQr-${a.id}" width="80" height="80"></canvas>
+      </div>
+      <div style="flex:1; min-width:180px;">
+        <div style="font-size:16px; font-weight:700;">${escapeHtml(a.nome)}</div>
+        <a href="${escapeHtml(a.link)}" target="_blank" rel="noopener" style="font-size:14px; color:var(--accent, #4f8cff); text-decoration:none; word-break:break-all;">${escapeHtml(a.link)}</a>
+        ${a.usuario ? `<div style="font-size:13px; color:var(--muted, #9aa4b2); margin-top:6px;">Usuário: <b style="color:var(--text, #e6e8ec);">${escapeHtml(a.usuario)}</b></div>` : ''}
+        ${a.senha ? `<div style="font-size:13px; color:var(--muted, #9aa4b2);">Senha: <b style="color:var(--text, #e6e8ec);">${escapeHtml(a.senha)}</b></div>` : ''}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicaoAcesso('${a.id}')">Editar</button>
+        <button class="del-btn" onclick="excluirAcesso('${a.id}')">Excluir</button>
+      </div>
+    `;
+    container.appendChild(card);
+
+    if(typeof QRCode !== 'undefined'){
+      const canvas = card.querySelector(`#acessoQr-${a.id}`);
+      QRCode.toCanvas(canvas, a.link, { width: 80, margin: 0 }, err => {
+        if(err) console.error('Falha ao gerar QR do acesso', a.id, err);
+      });
+    }
+  });
+}
+
+function excluirAcesso(id){
+  pedirConfirmacao('Excluir este acesso cadastrado?', () => {
+    const lista = getAcessos().filter(a => a.id !== id);
+    saveAcessos(lista);
+    renderAcessos();
+  });
+}
+
+let editandoAcessoId = null;
+
+function abrirEdicaoAcesso(id){
+  const reg = getAcessos().find(a => a.id === id);
+  if(!reg) return;
+
+  editandoAcessoId = id;
+  document.getElementById('editAcessoNome').value = reg.nome;
+  document.getElementById('editAcessoLink').value = reg.link;
+  document.getElementById('editAcessoUsuario').value = reg.usuario || '';
+  document.getElementById('editAcessoSenha').value = reg.senha || '';
+  document.getElementById('editAcessoErro').style.display = 'none';
+  document.getElementById('editAcessoModal').style.display = 'flex';
+}
+
+function fecharModalAcesso(){
+  editandoAcessoId = null;
+  document.getElementById('editAcessoModal').style.display = 'none';
+}
+
+function mostrarErroEdicaoAcesso(msg){
+  const el = document.getElementById('editAcessoErro');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function salvarEdicaoAcesso(){
+  if(!editandoAcessoId) return;
+
+  const nome = document.getElementById('editAcessoNome').value.trim();
+  const link = document.getElementById('editAcessoLink').value.trim();
+  const usuario = document.getElementById('editAcessoUsuario').value.trim();
+  const senha = document.getElementById('editAcessoSenha').value.trim();
+
+  if(!nome || !link){
+    mostrarErroEdicaoAcesso('Preencha ao menos o nome e o link.');
+    return;
+  }
+
+  const lista = getAcessos();
+  const idx = lista.findIndex(a => a.id === editandoAcessoId);
+  if(idx === -1) return;
+
+  lista[idx] = { ...lista[idx], nome, link, usuario, senha };
+  saveAcessos(lista);
+  fecharModalAcesso();
+  renderAcessos();
+}
+
+function excluirDoModalAcesso(){
+  if(!editandoAcessoId) return;
+  const idParaExcluir = editandoAcessoId;
+
+  pedirConfirmacao('Excluir este acesso cadastrado?', () => {
+    const lista = getAcessos().filter(a => a.id !== idParaExcluir);
+    saveAcessos(lista);
+    fecharModalAcesso();
+    renderAcessos();
+  });
+}
+
+function limparFiltroVagas(){
+  document.getElementById('filtroVagaDataIni').value = '';
+  document.getElementById('filtroVagaDataFim').value = '';
+  renderVagasTudo();
+}
+
+function renderVagasTudo(){
+  const dataIni = document.getElementById('filtroVagaDataIni').value;
+  const dataFim = document.getElementById('filtroVagaDataFim').value;
+
+  let lista = getVagasRegistros();
+  if(dataIni) lista = lista.filter(r => r.data >= dataIni);
+  if(dataFim) lista = lista.filter(r => r.data <= dataFim);
+
+  lista.sort((a,b) => b.data.localeCompare(a.data));
+
+  const tbody = document.getElementById('tbodyVagas');
+  tbody.innerHTML = '';
+  document.getElementById('emptyVagasMsg').style.display = lista.length ? 'none' : 'block';
+
+  let totalOrcado = 0, totalPreenchido = 0, totalFaltas = 0;
+
+  lista.forEach(r => {
+    totalOrcado += r.orcado;
+    totalPreenchido += r.preenchido;
+    totalFaltas += (r.faltas || 0);
+
+    const presenca = (r.presenca === null || r.presenca === undefined) ? '—' : r.presenca;
+    const emAberto = (r.emAberto === null || r.emAberto === undefined) ? '—' : r.emAberto;
+    const pct = r.orcado > 0 ? Math.round((r.preenchido / r.orcado) * 100) : 0;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${formatDate(r.data)}</td>
+      <td>${r.orcado}</td>
+      <td>${r.preenchido}</td>
+      <td>${presenca}</td>
+      <td>${emAberto}</td>
+      <td>${r.faltas || 0}</td>
+      <td>${pct}%</td>
+      <td>${escapeHtml(r.obs) || '—'}</td>
+      <td>
+        <button class="del-btn" style="color:var(--accent);" onclick="abrirEdicaoVaga('${r.id}')">Editar</button>
+        <button class="del-btn" onclick="excluirVaga('${r.id}')">Excluir</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('statVagaOrcado').textContent = totalOrcado;
+  document.getElementById('statVagaPreenchido').textContent = totalPreenchido;
+  document.getElementById('statVagaFaltas').textContent = totalFaltas;
+  document.getElementById('statVagaPct').textContent = totalOrcado > 0
+    ? Math.round((totalPreenchido / totalOrcado) * 100) + '%'
+    : '0%';
+}
+
+// ---- BACKUP ----
+function exportBackup(automatico){
+  const data = {
+    exportadoEm: new Date().toISOString(),
+    registros: getRegistros(),
+    almocoRegistros: getAlmocoRegistros(),
+    vagasRegistros: getVagasRegistros(),
+    produtividadePedidos: getProdutividadePedidos(),
+    acessos: getAcessos(),
+    totalHelppis: getTotalHelppis()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = todayStr();
+  a.href = url;
+  // nome fixo por dia nos backups automáticos, para que o navegador tente
+  // "substituir" a cópia da hora anterior em vez de acumular um arquivo por hora
+  a.download = automatico
+    ? `helppi-backup-auto-${stamp}.json`
+    : `helppi-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+  updateBackupInfo();
+}
+
+// ---- BACKUP AUTOMÁTICO DE HORA EM HORA ----
+const AUTO_BACKUP_KEY = 'helppi_auto_backup_enabled';
+const AUTO_BACKUP_LAST_HOUR_KEY = 'helppi_auto_backup_last_hour'; // guarda "YYYY-MM-DD-HH" do último backup feito
+
+// Handle do arquivo escolhido pelo usuário para sobrescrever a cada hora
+// (só existe durante esta sessão da página; funciona em Chrome/Edge no computador).
+let autoBackupFileHandle = null;
+
+function autoBackupAtivo(){
+  return localStorage.getItem(AUTO_BACKUP_KEY) === 'true';
+}
+
+function alternarAutoBackup(){
+  const checkbox = document.getElementById('autoBackupToggle');
+  const ativado = checkbox.checked;
+  localStorage.setItem(AUTO_BACKUP_KEY, ativado ? 'true' : 'false');
+  atualizarStatusAutoBackup();
+
+  if(ativado){
+    // faz um backup imediato ao ativar, em vez de esperar até o próximo bloco de hora
+    verificarBackupAutomatico(true);
+  }
+}
+
+function suportaEscolherArquivo(){
+  return typeof window.showSaveFilePicker === 'function';
+}
+
+// Deixa o usuário escolher (uma vez) o arquivo que será sobrescrito a cada
+// hora, em vez de baixar um arquivo novo toda hora.
+async function escolherArquivoBackupAutomatico(){
+  if(!suportaEscolherArquivo()){
+    showToast(
+      'Este navegador não permite sobrescrever o mesmo arquivo automaticamente (funciona no Chrome/Edge, em computador). ' +
+      'O backup automático vai continuar baixando um arquivo por hora com o mesmo nome.',
+      9000
+    );
+    return;
+  }
+  try{
+    autoBackupFileHandle = await window.showSaveFilePicker({
+      suggestedName: `helppi-backup-${todayStr()}.json`,
+      types: [{ description: 'Backup Helppi (JSON)', accept: {'application/json': ['.json']} }]
+    });
+    atualizarStatusAutoBackup();
+    showToast('Arquivo selecionado. A partir de agora ele será sobrescrito a cada hora.');
+    if(autoBackupAtivo()) verificarBackupAutomatico(true);
+  }catch(err){
+    // usuário cancelou o seletor de arquivo — não faz nada
+  }
+}
+
+// Sobrescreve de fato o arquivo escolhido com os dados atuais.
+async function escreverBackupNoArquivoEscolhido(){
+  if(!autoBackupFileHandle) return false;
+  try{
+    const permissao = await autoBackupFileHandle.requestPermission({ mode: 'readwrite' });
+    if(permissao !== 'granted') return false;
+
+    const dados = {
+      exportadoEm: new Date().toISOString(),
+      registros: getRegistros(),
+      almocoRegistros: getAlmocoRegistros(),
+      vagasRegistros: getVagasRegistros(),
+      produtividadePedidos: getProdutividadePedidos(),
+      acessos: getAcessos(),
+      totalHelppis: getTotalHelppis()
+    };
+    const writable = await autoBackupFileHandle.createWritable();
+    await writable.write(JSON.stringify(dados, null, 2));
+    await writable.close();
+    return true;
+  }catch(err){
+    console.error('Falha ao sobrescrever o arquivo de backup automático:', err);
+    return false;
+  }
+}
+
+function atualizarStatusAutoBackup(){
+  const statusEl = document.getElementById('autoBackupStatus');
+  const partes = [];
+
+  partes.push(autoBackupAtivo() ? 'Backup automático de hora em hora ativado.' : 'Backup automático desativado.');
+
+  if(autoBackupAtivo()){
+    const ultimaHora = localStorage.getItem(AUTO_BACKUP_LAST_HOUR_KEY);
+    partes.push(ultimaHora
+      ? `Último backup automático: ${ultimaHora.slice(0,10).split('-').reverse().join('/')} às ${ultimaHora.slice(11,13)}h.`
+      : 'Ainda não foi feito nenhum backup automático.');
+
+    partes.push(autoBackupFileHandle
+      ? 'Modo: sobrescrevendo sempre o mesmo arquivo escolhido.'
+      : (suportaEscolherArquivo()
+          ? 'Modo: baixando um arquivo por hora (escolha um arquivo abaixo para sobrescrever o mesmo em vez disso).'
+          : 'Modo: baixando um arquivo por hora com o mesmo nome (navegador sem suporte a sobrescrever automaticamente).'));
+  }
+
+  statusEl.textContent = partes.join(' ');
+}
+
+// checa a cada 30s se entramos numa nova hora cheia (com margem de alguns
+// minutos, caso a aba fique em segundo plano e o intervalo atrase um pouco)
+async function verificarBackupAutomatico(forcar){
+  if(!autoBackupAtivo()) return;
+
+  const agora = new Date();
+  const minutos = agora.getMinutes();
+  if(!forcar && minutos > 4) return; // só dispara nos primeiros minutos de cada hora
+
+  const chaveHora = `${todayStr()}-${pad2(agora.getHours())}`;
+  if(!forcar && localStorage.getItem(AUTO_BACKUP_LAST_HOUR_KEY) === chaveHora) return; // já fez essa hora
+
+  let sucesso = false;
+  let usouArquivoEscolhido = false;
+
+  if(autoBackupFileHandle){
+    sucesso = await escreverBackupNoArquivoEscolhido();
+    if(sucesso){
+      usouArquivoEscolhido = true;
+      localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+      updateBackupInfo();
+    }else{
+      // o handle pode ter perdido a permissão (ex: navegador revogou); descarta
+      // para não ficar tentando escrever num arquivo inacessível toda hora
+      autoBackupFileHandle = null;
+    }
+  }
+
+  if(!sucesso){
+    // sem arquivo escolhido (ou falhou): baixa um arquivo com o mesmo nome do
+    // dia inteiro, para no mínimo tentar "substituir" a cópia anterior
+    exportBackup(true);
+    sucesso = true;
+  }
+
+  localStorage.setItem(AUTO_BACKUP_LAST_HOUR_KEY, chaveHora);
+  atualizarStatusAutoBackup();
+  showToast(usouArquivoEscolhido
+    ? `📦 Backup automático das ${pad2(agora.getHours())}h salvo no arquivo escolhido.`
+    : `📦 Backup automático das ${pad2(agora.getHours())}h baixado. Confira os downloads.`);
+}
+
+function lerArquivoComoTexto(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Falha ao ler ' + file.name));
+    reader.readAsText(file);
+  });
+}
+
+async function importBackup(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+
+  let registrosCombinados = [];
+  let almocoCombinados = [];
+  let vagasCombinados = [];
+  let produtividadeCombinados = [];
+  let acessosCombinados = [];
+  let maiorTotalHelppis = null;
+  const idsVistos = new Set();
+  const almocoIdsVistos = new Set();
+  const vagasIdsVistos = new Set();
+  const produtividadeIdsVistos = new Set();
+  const acessosIdsVistos = new Set();
+  const arquivosComErro = [];
+
+  for(const file of files){
+    try{
+      const texto = await lerArquivoComoTexto(file);
+      const parsed = JSON.parse(texto);
+      const registros = Array.isArray(parsed) ? parsed : (parsed.registros || []);
+      const almocoRegistros = Array.isArray(parsed) ? [] : (parsed.almocoRegistros || []);
+      const vagasRegistros = Array.isArray(parsed) ? [] : (parsed.vagasRegistros || []);
+      const produtividadePedidos = Array.isArray(parsed) ? [] : (parsed.produtividadePedidos || []);
+      const acessos = Array.isArray(parsed) ? [] : (parsed.acessos || []);
+      const totalHelppisImportado = Array.isArray(parsed) ? null : parsed.totalHelppis;
+      if(Number.isFinite(totalHelppisImportado) && totalHelppisImportado >= 1){
+        if(maiorTotalHelppis === null || totalHelppisImportado > maiorTotalHelppis){
+          maiorTotalHelppis = totalHelppisImportado;
+        }
+      }
+
+      if(!Array.isArray(registros)) throw new Error('formato inválido');
+
+      registros.forEach(r => {
+        if(!idsVistos.has(r.id)){
+          idsVistos.add(r.id);
+          registrosCombinados.push(r);
+        }
+      });
+      almocoRegistros.forEach(r => {
+        if(!almocoIdsVistos.has(r.id)){
+          almocoIdsVistos.add(r.id);
+          almocoCombinados.push(r);
+        }
+      });
+      vagasRegistros.forEach(r => {
+        if(!vagasIdsVistos.has(r.id)){
+          vagasIdsVistos.add(r.id);
+          vagasCombinados.push(r);
+        }
+      });
+      produtividadePedidos.forEach(p => {
+        if(!produtividadeIdsVistos.has(p.pedidoId)){
+          produtividadeIdsVistos.add(p.pedidoId);
+          produtividadeCombinados.push(p);
+        }
+      });
+      acessos.forEach(a => {
+        if(!acessosIdsVistos.has(a.id)){
+          acessosIdsVistos.add(a.id);
+          acessosCombinados.push(a);
+        }
+      });
+    }catch(err){
+      arquivosComErro.push(file.name);
+    }
+  }
+
+  const totalItens = registrosCombinados.length + almocoCombinados.length + vagasCombinados.length + produtividadeCombinados.length + acessosCombinados.length;
+
+  if(!totalItens){
+    showToast('Nenhum dado válido encontrado nos arquivo(s) selecionado(s).');
+    event.target.value = '';
+    return;
+  }
+
+  pedirConfirmacao(
+    `Foram lidos ${registrosCombinados.length} registro(s) de Helppi, ${almocoCombinados.length} lançamento(s) de almoço, ${vagasCombinados.length} registro(s) de vagas, ${produtividadeCombinados.length} pedido(s) de produtividade e ${acessosCombinados.length} acesso(s) cadastrado(s), de ${files.length - arquivosComErro.length} arquivo(s).\n\n` +
+    'Confirmar = Mesclar com os dados atuais. Para SUBSTITUIR tudo em vez de mesclar, clique em Cancelar e use "Apagar todos os dados" antes de importar.',
+    () => {
+      const registrosAtuais = getRegistros();
+      const idsAtuais = new Set(registrosAtuais.map(r => r.id));
+      const novosRegistros = registrosCombinados.filter(r => !idsAtuais.has(r.id));
+      saveRegistros(registrosAtuais.concat(novosRegistros));
+
+      const almocoAtuais = getAlmocoRegistros();
+      const idsAlmocoAtuais = new Set(almocoAtuais.map(r => r.id));
+      const novosAlmoco = almocoCombinados.filter(r => !idsAlmocoAtuais.has(r.id));
+      saveAlmocoRegistros(almocoAtuais.concat(novosAlmoco));
+
+      const vagasAtuais = getVagasRegistros();
+      const idsVagasAtuais = new Set(vagasAtuais.map(r => r.id));
+      const novasVagas = vagasCombinados.filter(r => !idsVagasAtuais.has(r.id));
+      saveVagasRegistros(vagasAtuais.concat(novasVagas));
+
+      const produtividadeAtuais = getProdutividadePedidos();
+      const idsProdutividadeAtuais = new Set(produtividadeAtuais.map(p => p.pedidoId));
+      const novosProdutividade = produtividadeCombinados.filter(p => !idsProdutividadeAtuais.has(p.pedidoId));
+      saveProdutividadePedidos(produtividadeAtuais.concat(novosProdutividade));
+
+      const acessosAtuais = getAcessos();
+      const idsAcessosAtuais = new Set(acessosAtuais.map(a => a.id));
+      const novosAcessos = acessosCombinados.filter(a => !idsAcessosAtuais.has(a.id));
+      saveAcessos(acessosAtuais.concat(novosAcessos));
+
+      if(maiorTotalHelppis !== null && maiorTotalHelppis > getTotalHelppis()){
+        saveTotalHelppis(maiorTotalHelppis);
+      }
+
+      renderAll();
+      renderAlmocoTudo();
+      renderVagasTudo();
+      renderProdutividade();
+      renderAcessos();
+
+      let msg = `Importação concluída: ${totalItens} item(ns) processado(s).`;
+      if(arquivosComErro.length){
+        msg += ` Não foi possível ler ${arquivosComErro.length} arquivo(s): ${arquivosComErro.join(', ')}.`;
+      }
+      showToast(msg);
+    }
+  );
+
+  event.target.value = '';
+}
+
+function limparTudo(){
+  pedirConfirmacao(
+    'Isso vai apagar TODOS os dados salvos neste dispositivo (Helppis, almoço e vagas). Essa ação não pode ser desfeita. Deseja continuar?',
+    () => {
+      saveRegistros([]);
+      saveAlmocoRegistros([]);
+      saveVagasRegistros([]);
+      renderAll();
+      renderAlmocoTudo();
+      renderVagasTudo();
+      showToast('Todos os dados foram apagados.');
+    }
+  );
+}
+
+function updateBackupInfo(){
+  const last = localStorage.getItem(LAST_BACKUP_KEY);
+  const total = getRegistros().length;
+  const totalAlmoco = getAlmocoRegistros().length;
+  const totalVagas = getVagasRegistros().length;
+  const totalProdutividade = getProdutividadePedidos().length;
+  const totalAcessos = getAcessos().length;
+  const infoEl = document.getElementById('backupInfo');
+  const lastStr = last ? new Date(last).toLocaleString('pt-BR') : 'nenhum backup gerado ainda';
+  infoEl.textContent = `Registros de Helppi: ${total} · Lançamentos de almoço: ${totalAlmoco} · Registros de vagas: ${totalVagas} · Pedidos de produtividade: ${totalProdutividade} · Acessos cadastrados: ${totalAcessos} · Último backup: ${lastStr}`;
+}
+
+// ---- PRODUTIVIDADE (cruzamento das planilhas de pedidos com o histórico de Helppis) ----
+const PRODUTIVIDADE_KEY = 'helppi_produtividade_pedidos_v1';
+const ACESSOS_KEY = 'helppi_acessos_cadastrados_v1';
+const TOTAL_HELPPIS_KEY = 'helppi_total_terminais_v1';
+
+function getProdutividadePedidos(){
+  if(_produtividadeCache !== null) return _produtividadeCache;
+  try{
+    _produtividadeCache = JSON.parse(localStorage.getItem(PRODUTIVIDADE_KEY)) || [];
+  }catch(e){ _produtividadeCache = []; }
+  return _produtividadeCache;
+}
+function saveProdutividadePedidos(list){
+  _produtividadeCache = list;
+  localStorage.setItem(PRODUTIVIDADE_KEY, JSON.stringify(list));
+  pushToCloud('produtividade', list);
+}
+
+// Converte "17-07-2026 09:04:32" (ou só a data) em { data:'2026-07-17', hora:'09:04' }
+function parseDataHoraBR(str){
+  if(!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{2})-(\d{2})-(\d{4})[ T]?(\d{2}):(\d{2})/);
+  if(!m) return null;
+  const [, d, mo, y, h, mi] = m;
+  return { data: `${y}-${mo}-${d}`, hora: `${h}:${mi}` };
+}
+
+// "Helppi03" / "HELPPI 17" / "helppi13" -> "03" / "17" / "13"
+function extrairNumeroHelppi(separador){
+  if(!separador) return null;
+  const m = String(separador).match(/(\d+)/);
+  if(!m) return null;
+  return pad2(parseInt(m[1], 10));
+}
+
+// true se o valor da coluna "separador" é um código de terminal (ex: "helppi13", "HELPPI 17")
+// em vez de já ser o nome do operador (algumas planilhas trazem o nome direto).
+function separadorEhTerminalHelppi(valor){
+  return /^helppi\s*\d+$/i.test(String(valor || '').trim());
+}
+
+function titleCasePt(str){
+  const minusculas = new Set(['de','da','do','das','dos','e']);
+  return String(str).trim().toLowerCase().split(/\s+/).filter(Boolean).map((w,i) => {
+    if(i > 0 && minusculas.has(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+// Descobre qual operador estava no Helppi numa data/hora específica, olhando o
+// histórico de lançamentos da aba Helppis (o lançamento mais recente com horário
+// menor ou igual ao horário do pedido é considerado o operador em uso no momento).
+function operadorNoMomento(helppiNum, data, hora){
+  if(!helppiNum || !data) return { operador: null, inferido: false };
+  const doHelppi = getRegistros().filter(r => r.helppi === helppiNum);
+
+  const registrosDia = doHelppi
+    .filter(r => r.data === data)
+    .sort((a,b) => a.hora.localeCompare(b.hora));
+
+  let candidato = null;
+  for(const r of registrosDia){
+    if(!hora || r.hora <= hora) candidato = r;
+    else break;
+  }
+  if(candidato) return { operador: candidato.operador, inferido: false };
+
+  // nenhum lançamento no mesmo dia até esse horário (turno começou antes da meia-noite,
+  // ou o lançamento na aba Helppis foi feito com atraso) -> usa o último lançamento
+  // anterior a essa data como melhor estimativa
+  const anteriores = doHelppi
+    .filter(r => r.data < data)
+    .sort((a,b) => (a.data + a.hora).localeCompare(b.data + b.hora));
+  if(anteriores.length){
+    return { operador: anteriores[anteriores.length - 1].operador, inferido: true };
+  }
+
+  return { operador: null, inferido: false };
+}
+
+async function processarPlanilhasProdutividade(event){
+  const files = Array.from(event.target.files || []);
+  if(!files.length) return;
+
+  const statusEl = document.getElementById('produtividadeStatus');
+
+  if(typeof XLSX === 'undefined'){
+    statusEl.textContent = '⚠ Não foi possível carregar a biblioteca de leitura de planilhas (verifique sua conexão com a internet e recarregue a página).';
+    showToast('Falha ao carregar biblioteca de planilhas.');
+    event.target.value = '';
+    return;
+  }
+
+  statusEl.textContent = 'Lendo planilha(s)...';
+
+  const existentes = getProdutividadePedidos();
+  const idsExistentes = new Set(existentes.map(p => p.pedidoId));
+  const novosPedidos = [];
+  let semCorrespondencia = 0;
+  let ignoradosCancelados = 0;
+  let ignoradosComNome = 0;
+  let inferidosDiaAnterior = 0;
+  const arquivosComErro = [];
+
+  for(const file of files){
+    try{
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const linhas = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      linhas.forEach(linha => {
+        const norm = {};
+        Object.keys(linha).forEach(k => { norm[k.trim().toLowerCase()] = linha[k]; });
+
+        const pedidoId = String(norm['id do pedido'] || norm['número do pedido'] || '').trim();
+        if(!pedidoId || idsExistentes.has(pedidoId)) return;
+        idsExistentes.add(pedidoId); // trava o pedido assim que visto, mesmo que a linha seja ignorada por outro motivo
+        // (evita contar o mesmo pedido 2x quando ele aparece em mais de uma linha, ex: separação dividida entre duas pessoas)
+
+        const cancelado = String(norm['cancelamento sem separação'] || '').trim().toUpperCase();
+        if(cancelado === 'SIM'){ ignoradosCancelados++; return; }
+
+        const inicio = parseDataHoraBR(norm['início da separação']) || parseDataHoraBR(norm['data (referente ao pedido)']);
+        if(!inicio) return;
+
+        const separadorRaw = norm['separador'];
+        if(!separadorEhTerminalHelppi(separadorRaw)){ ignoradosComNome++; return; } // ignora pedidos que já vêm com nome do operador
+
+        const helppiNum = extrairNumeroHelppi(separadorRaw);
+        const resultado = helppiNum ? operadorNoMomento(helppiNum, inicio.data, inicio.hora) : { operador: null, inferido: false };
+        const operador = resultado.operador;
+
+        if(!operador) semCorrespondencia++;
+        if(operador && resultado.inferido) inferidosDiaAnterior++;
+
+        novosPedidos.push({
+          pedidoId,
+          operador: operador || null,
+          inferido: !!(operador && resultado.inferido),
+          helppi: helppiNum,
+          data: inicio.data,
+          hora: inicio.hora,
+          itens: Number(norm['total de itens']) || 0,
+          tempoSeparacao: Number(norm['tempo de separação (em minutos)']) || 0,
+          canal: norm['canal de vendas'] || ''
+        });
+      });
+    }catch(err){
+      arquivosComErro.push(file.name);
+    }
+  }
+
+  saveProdutividadePedidos(existentes.concat(novosPedidos));
+
+  let msg = `${novosPedidos.length} pedido(s) novo(s) processado(s) de ${files.length - arquivosComErro.length} arquivo(s).`;
+  if(ignoradosComNome) msg += ` ${ignoradosComNome} ignorado(s) por já virem com nome de operador (fora do escopo).`;
+  if(ignoradosCancelados) msg += ` ${ignoradosCancelados} cancelado(s) ignorado(s).`;
+  if(inferidosDiaAnterior) msg += ` ${inferidosDiaAnterior} identificado(s) pelo último lançamento de um dia anterior (sem lançamento no próprio dia até aquele horário).`;
+  if(semCorrespondencia) msg += ` ${semCorrespondencia} sem operador identificado (nenhum lançamento de Helppi encontrado, nem no dia nem antes).`;
+  if(arquivosComErro.length) msg += ` Falha ao ler: ${arquivosComErro.join(', ')}.`;
+  statusEl.textContent = msg;
+  showToast('Planilha(s) processada(s).');
+  updateBackupInfo();
+
+  event.target.value = '';
+  renderProdutividade();
+}
+
+function limparProdutividade(){
+  pedirConfirmacao(
+    'Isso vai apagar todos os dados de produtividade importados (os registros da aba Helppis não são afetados). Deseja continuar?',
+    () => {
+      saveProdutividadePedidos([]);
+      renderProdutividade();
+      updateBackupInfo();
+      showToast('Dados de produtividade apagados.');
+    }
+  );
+}
+
+function agregarProdutividade(pedidos){
+  const mapa = new Map();
+  pedidos.forEach(p => {
+    const chave = `${p.helppi || '—'}||${p.data}`;
+    if(!mapa.has(chave)){
+      mapa.set(chave, { helppi: p.helppi || '—', operador: p.operador || 'Não identificado', data: p.data, pedidos: 0, itens: 0, tempoTotal: 0, inferidos: 0 });
+    }
+    const item = mapa.get(chave);
+    item.pedidos += 1;
+    item.itens += p.itens;
+    item.tempoTotal += p.tempoSeparacao;
+    if(p.inferido) item.inferidos += 1;
+    // se o operador só foi identificado em algumas linhas do mesmo Helppi/dia, guarda o nome assim que aparecer
+    if(item.operador === 'Não identificado' && p.operador) item.operador = p.operador;
+  });
+  return Array.from(mapa.values());
+}
+
+function filtrarPedidosProdutividade(){
+  const dataIni = document.getElementById('filtroProdDataIni').value;
+  const dataFim = document.getElementById('filtroProdDataFim').value;
+  const filtroOperador = (document.getElementById('filtroProdOperador').value || '').trim().toLowerCase();
+
+  let pedidos = getProdutividadePedidos();
+  if(dataIni) pedidos = pedidos.filter(p => p.data >= dataIni);
+  if(dataFim) pedidos = pedidos.filter(p => p.data <= dataFim);
+  if(filtroOperador){
+    pedidos = pedidos.filter(p => (p.operador || 'não identificado').toLowerCase().includes(filtroOperador));
+  }
+  return pedidos;
+}
+
+function renderProdutividade(){
+  const pedidos = filtrarPedidosProdutividade();
+  const agregados = agregarProdutividade(pedidos)
+    .sort((a,b) => b.data.localeCompare(a.data) || String(a.helppi).localeCompare(String(b.helppi)));
+
+  const tbody = document.getElementById('tbodyProdutividade');
+  const emptyMsg = document.getElementById('emptyProdMsg');
+
+  if(!agregados.length){
+    tbody.innerHTML = '';
+    emptyMsg.style.display = 'block';
+  }else{
+    emptyMsg.style.display = 'none';
+    tbody.innerHTML = agregados.map(a => `
+      <tr>
+        <td>Helppi ${escapeHtml(a.helppi)}</td>
+        <td>${escapeHtml(a.operador)}${a.inferidos ? ` <span class="hint" title="${a.inferidos} pedido(s) identificado(s) pelo último lançamento de um dia anterior, sem lançamento próprio no dia até aquele horário">⚠ ${a.inferidos}</span>` : ''}</td>
+        <td>${formatDate(a.data)}</td>
+        <td>${a.pedidos}</td>
+        <td>${a.itens}</td>
+        <td>${a.pedidos ? Math.round(a.tempoTotal / a.pedidos) : 0} min</td>
+      </tr>
+    `).join('');
+  }
+
+  document.getElementById('statProdPedidos').textContent = pedidos.length;
+  const operadoresUnicos = new Set(pedidos.filter(p => p.operador).map(p => p.operador));
+  document.getElementById('statProdOperadores').textContent = operadoresUnicos.size;
+  document.getElementById('statProdSemOperador').textContent = pedidos.filter(p => !p.operador).length;
+
+  const total = getProdutividadePedidos().length;
+  document.getElementById('produtividadeInfo').textContent = `Total de pedidos importados (todos os períodos, sem filtro): ${total}`;
+}
+
+function exportarProdutividadeCSV(){
+  const pedidos = filtrarPedidosProdutividade();
+  const agregados = agregarProdutividade(pedidos)
+    .sort((a,b) => b.data.localeCompare(a.data) || String(a.helppi).localeCompare(String(b.helppi)));
+
+  const linhas = ['Helppi;Operador;Data;Pedidos;Itens;Tempo medio (min)'];
+  agregados.forEach(a => {
+    linhas.push(`Helppi ${a.helppi};${a.operador};${formatDate(a.data)};${a.pedidos};${a.itens};${a.pedidos ? Math.round(a.tempoTotal / a.pedidos) : 0}`);
+  });
+  const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `produtividade_${todayStr()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function limparFiltroProdutividade(){
+  document.getElementById('filtroProdDataIni').value = '';
+  document.getElementById('filtroProdDataFim').value = '';
+  document.getElementById('filtroProdOperador').value = '';
+  renderProdutividade();
+}
+
+// ---- QR CODE (Acesso Separador iFood) ----
+function renderIfoodQr(){
+  const canvas = document.getElementById('ifoodQrCanvas');
+  if(!canvas || typeof QRCode === 'undefined') return;
+  QRCode.toCanvas(canvas, 'https://separador.ifood.com.br', {
+    width: 188,
+    margin: 0,
+    color: { dark: '#000000', light: '#ffffff' }
+  }, function(err){
+    if(err) console.error('Falha ao gerar QR code:', err);
+  });
+}
+
+// ---- INIT ----
+function init(){
+  atualizarRelogio();
+  setInterval(atualizarRelogio, 1000);
+
+  document.getElementById('presencaLojaData').value = todayStr();
+  document.getElementById('presencaLojaData').addEventListener('change', renderListaPresencaRapido);
+  renderListaPresencaRapido();
+
+  document.getElementById('filtroPresencaData').addEventListener('change', renderHistoricoPresenca);
+  document.getElementById('filtroPresencaNome').addEventListener('change', renderHistoricoPresenca);
+  renderFiltroPresencaNome();
+  renderHistoricoPresenca();
+
+  // aba de almoço
+  document.getElementById('filtroAlmocoData').addEventListener('change', renderTabelaAlmoco);
+  document.getElementById('filtroAlmocoColaborador').addEventListener('change', renderTabelaAlmoco);
+  renderFiltroAlmocoColaborador();
+
+  // aba de vagas
+  document.getElementById('fVagaData').value = todayStr();
+  document.getElementById('filtroVagaDataIni').addEventListener('change', renderVagasTudo);
+  document.getElementById('filtroVagaDataFim').addEventListener('change', renderVagasTudo);
+  document.getElementById('fVagaData').addEventListener('change', atualizarVagaPresencaAutomatica);
+  atualizarVagaPresencaAutomatica();
+  ['fVagaData','fVagaOrcado','fVagaPreenchido','fVagaPresenca','fVagaEmAberto','fVagaFaltas'].forEach(id => {
+    document.getElementById(id).addEventListener('change', esconderErroFormVaga);
+  });
+
+  // aba de produtividade
+  document.getElementById('filtroProdDataIni').addEventListener('change', renderProdutividade);
+  document.getElementById('filtroProdDataFim').addEventListener('change', renderProdutividade);
+  document.getElementById('filtroProdOperador').addEventListener('input', renderProdutividade);
+  renderProdutividade();
+
+  const autoBackupToggle = document.getElementById('autoBackupToggle');
+  autoBackupToggle.checked = autoBackupAtivo();
+  autoBackupToggle.addEventListener('change', alternarAutoBackup);
+  atualizarStatusAutoBackup();
+  setInterval(verificarBackupAutomatico, 30000);
+
+  document.getElementById('novoOperadorPresencaNome').addEventListener('keydown', e => {
+    if(e.key === 'Enter') adicionarOperadorPresenca();
+  });
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){
+      if(document.getElementById('confirmModal').style.display !== 'none'){
+        fecharConfirmModal();
+      }else if(document.getElementById('editAlmocoModal').style.display !== 'none'){
+        fecharModalAlmoco();
+      }else if(document.getElementById('editVagaModal').style.display !== 'none'){
+        fecharModalVaga();
+      }else if(document.getElementById('editAcessoModal').style.display !== 'none'){
+        fecharModalAcesso();
+      }else if(document.getElementById('editOperadorModal').style.display !== 'none'){
+        fecharModalOperador();
+      }
+    }
+  });
+
+  document.getElementById('confirmModalYes').addEventListener('click', () => {
+    const cb = confirmCallback;
+    fecharConfirmModal();
+    if(cb) cb();
+  });
+
+  renderAll();
+  renderIfoodQr();
+  renderAcessos();
+  carregarDadosNuvem();
+  setupRealtime();
+}
+init();
+</script>
+</body>
+</html>
