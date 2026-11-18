@@ -3374,7 +3374,101 @@ function interpretarAgendaHelpper(linhasTexto){
   if(!data){ const md = /(\d{2})\s*\/\s*(\d{2})\s*\/\s*(\d{4})/.exec(linhasTexto.join('\n')); if(md) data = `${md[3]}-${md[2]}-${md[1]}`; }
   return { data: dataPadrao || data, loja, linhas, vagas };
 }
-function interpretarAgendaTexto(linhasTexto){
+// ---- Tela agrupada por horário: "07:00 · Picking — E-commerce — 8/8 Helppers confirmados..." e, abaixo, uma linha por Helpper ----
+const MESES_PT = { JANEIRO:1, FEVEREIRO:2, MARCO:3, ABRIL:4, MAIO:5, JUNHO:6, JULHO:7, AGOSTO:8, SETEMBRO:9, OUTUBRO:10, NOVEMBRO:11, DEZEMBRO:12 };
+function dataPorExtenso(texto){
+  const m = /(\d{1,2}) DE (JANEIRO|FEVEREIRO|MARCO|ABRIL|MAIO|JUNHO|JULHO|AGOSTO|SETEMBRO|OUTUBRO|NOVEMBRO|DEZEMBRO) DE (\d{4})/.exec(normalizarTexto(texto));
+  return m ? `${m[3]}-${pad2(MESES_PT[m[2]])}-${pad2(+m[1])}` : '';
+}
+function ehCabecalhoGrupo(t){
+  return /confirmados/i.test(t) || /^\s*\d{1,2}\s*[:;]\s*\d{2}\s*[-–—·•.]\s*(Picking|Packing)/i.test(t);
+}
+function tokenNome(raw){
+  const t = String(raw || '').replace(/^[^A-Za-zÀ-ÿ]+/, '').replace(/[^A-Za-zÀ-ÿ'’\-]+$/, '');
+  if(/^[A-ZÀ-Ý][a-zà-ÿ'’\-]{2,}$/.test(t) || /^[a-zà-ÿ]{4,}$/.test(t)) return t.charAt(0).toUpperCase() + t.slice(1);
+  return '';
+}
+function interpretarAgendaAgrupada(L){
+  const texto = L.map(l => l.text).join('\n');
+  const data = dataPorExtenso(texto);
+  let loja = '';
+  const ml = /Assa[íi]\s*-\s*Maracan\S*\s*-\s*Loja\s*\d+/i.exec(texto);
+  if(ml) loja = ml[0].replace(/\s+/g, ' ');
+  else { const m2 = /Loja\s*(\d{2,4})/i.exec(texto); if(m2) loja = 'Loja ' + m2[1]; }
+  const palavras = [];
+  L.forEach(l => (l.words || []).forEach(w => palavras.push(w)));
+  const W = Math.max(1, ...palavras.map(w => w.x1));
+  // grupos (um por horário), na ordem em que aparecem de cima para baixo
+  const grupos = [];
+  L.forEach(l => {
+    if(!ehCabecalhoGrupo(l.text)) return;
+    const t = /(\d{1,2})\s*[:;]\s*(\d{2})/.exec(l.text);
+    if(!t || +t[1] > 23 || +t[2] > 59) return;
+    const ws = l.words || [];
+    const c = /(\d+)\s*\/\s*(\d+)\s*Helppers?/i.exec(l.text);
+    grupos.push({ inicio: pad2(+t[1]) + ':' + pad2(+t[2]), y: ws.length ? Math.min(...ws.map(w => w.y0)) : 0, madrugada: /madrugada/i.test(l.text),
+                  conf: c ? +c[1] : null, nomes: [], horas: [] });
+  });
+  grupos.sort((a, b) => a.y - b.y);
+  // coluna do nome: pelo cabeçalho "HELPPER", ou (sem cabeçalho) pela coluna com mais nomes
+  let xIni = null, xFim = null;
+  const cab = L.find(l => /helpper/i.test(l.text) && /estabelec/i.test(l.text));
+  if(cab){
+    const wh = (cab.words || []).find(w => /^helpper/i.test(w.t));
+    if(wh){ xIni = wh.x0 - 5; xFim = wh.x0 + 0.03 * W; }
+  }
+  const primeiroGrupoY = grupos.length ? grupos[0].y : 0;
+  // palavras dos cabeçalhos (tabela e grupos) nunca são nomes
+  const deCabecalho = new Set();
+  L.forEach(l => { if(ehCabecalhoGrupo(l.text) || (/helpper/i.test(l.text) && /estabelec/i.test(l.text))) (l.words || []).forEach(w => deCabecalho.add(w)); });
+  const cand0 = palavras.filter(w => !deCabecalho.has(w) && w.y0 > primeiroGrupoY && tokenNome(w.t));
+  const alturas = cand0.map(w => w.y1 - w.y0).sort((a, b) => a - b), mediana = alturas[Math.floor(alturas.length / 2)] || 0;
+  const cand = cand0.filter(w => (w.y1 - w.y0) >= 0.6 * mediana);          // descarta pontinhos e ruído miúdo do OCR
+  if(xIni === null){
+    const bin = Math.max(20, Math.round(W * 0.012)), cnt = {};
+    cand.forEach(w => { const b = Math.floor(w.x0 / bin); cnt[b] = (cnt[b] || 0) + 1; });
+    const melhor = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    if(melhor !== undefined){ xIni = (+melhor - 1) * bin; xFim = (+melhor + 2) * bin; }
+  }
+  const usados = new Set();
+  if(xIni !== null){
+    cand.filter(w => w.x0 >= xIni && w.x0 <= xFim).sort((a, b) => a.x0 - b.x0).forEach(w0 => {      // da esquerda p/ direita: o 1º nome da linha vem antes dos outros
+      if(usados.has(w0)) return;
+      const alt = Math.max(10, w0.y1 - w0.y0), cy = (w0.y0 + w0.y1) / 2;
+      const faixa = palavras.filter(w => w !== w0 && Math.abs((w.y0 + w.y1) / 2 - cy) < alt * 0.7 && w.x0 >= w0.x1 - 2).sort((a, b) => a.x0 - b.x0);
+      const partes = [tokenNome(w0.t)]; let fim = w0.x1, pend = [];
+      for(const w of faixa){
+        if(!/[A-Za-zÀ-ÿ]/.test(w.t) || w.x0 < fim - 2) continue;           // ruído do OCR dentro do nome (pontos, números, marcas)
+        if(w.x0 - fim > alt * 2.2) break;                                   // acabou a coluna do nome
+        const tk = tokenNome(w.t);
+        if(tk){ partes.push(...pend, tk); pend = []; fim = w.x1; usados.add(w); }
+        else if(/^(da|de|do|dos|das|e)$/i.test(w.t.replace(/[^A-Za-zÀ-ÿ]/g, ''))){ pend.push(w.t.replace(/[^A-Za-zÀ-ÿ]/g, '').toLowerCase() === 'e' ? 'e' : w.t.replace(/[^A-Za-zÀ-ÿ]/g, '')); fim = w.x1; }
+        else break;
+      }
+      usados.add(w0);
+      const g = grupos.filter(x => x.y < w0.y0).pop();
+      if(g) g.nomes.push({ nome: partes.join(' '), y: w0.y0 });
+    });
+    grupos.forEach(g => { g.nomes.sort((a, b) => a.y - b.y); });
+  }
+  // duração: "6h"/"8h" que aparece nas linhas do grupo; sem leitura, 6h (8h na madrugada)
+  grupos.forEach((g, i) => {
+    const prox = grupos[i + 1] ? grupos[i + 1].y : Infinity;
+    palavras.forEach(w => { const m = /^(\d{1,2})\s*h$/i.exec(w.t); if(m && w.y0 > g.y && w.y0 < prox) g.horas.push(+m[1]); });
+    const c = {}; g.horas.forEach(h => c[h] = (c[h] || 0) + 1);
+    g.dur = +(Object.keys(c).sort((a, b) => c[b] - c[a])[0]) || (g.madrugada ? 8 : 6);
+  });
+  const linhas = [], avisos = [];
+  grupos.forEach(g => {
+    const m = (hhmmParaMin(g.inicio) + g.dur * 60) % 1440;
+    const fim = pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
+    g.nomes.forEach(n => linhas.push({ nome: n.nome, data, inicio: g.inicio, fim, entrada: '', situacao: '', aviso: '' }));
+    if(g.conf !== null && g.nomes.length !== g.conf) avisos.push(`${g.inicio}: o print diz ${g.conf} Helpper(s) confirmado(s), li ${g.nomes.length}`);
+  });
+  return { data, loja, linhas, vagas: 0, avisos };
+}
+function interpretarAgendaTexto(linhasTexto, linhasObj){
+  if(linhasObj && linhasObj.some(l => (l.words || []).length) && linhasObj.some(l => /confirmados/i.test(l.text))) return interpretarAgendaAgrupada(linhasObj);
   if(linhasTexto.filter(ehLinhaHelpper).length >= 2) return interpretarAgendaHelpper(linhasTexto);
   return interpretarAgendaZubaleTexto(linhasTexto);
 }
@@ -3440,7 +3534,8 @@ async function lerPrintAgenda(){
       try{
         const canvas = await prepararImagemParaOcr(arq);
         const r = await worker.recognize(canvas);
-        resultados.push(interpretarAgendaTexto((r.data.lines || []).map(l => l.text.replace(/\s+$/, ''))));
+        const objs = (r.data.lines || []).map(l => ({ text: l.text.replace(/\s+$/, ''), words: (l.words || []).map(w => ({ t: w.text, x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1 })) }));
+        resultados.push(interpretarAgendaTexto(objs.map(o => o.text), objs));
       }catch(e){ console.error(e); falhas.push(arq.name || ('print ' + atual)); }
     }
     mostrarAgendaPreview(resultados);
@@ -3477,7 +3572,8 @@ function mostrarAgendaPreview(res){
   const comum = Object.keys(cont).sort((a, b) => cont[b] - cont[a])[0] || document.getElementById('agendaFiltroData').value || todayStr();
   let assumiu = 0; linhas.forEach(l => { if(!l.data){ l.data = comum; assumiu++; } });
   linhas.sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.inicio).localeCompare(String(b.inicio)) || String(a.nome).localeCompare(String(b.nome)));
-  _agendaPreview = { linhas, repetidas, assumiu };
+  const avisosLeitura = []; lista.forEach(r => (r && r.avisos || []).forEach(a => avisosLeitura.push(a)));
+  _agendaPreview = { linhas, repetidas, assumiu, avisosLeitura };
   document.getElementById('agendaPrevLoja').value = loja;
   document.getElementById('agendaPreview').style.display = 'block';
   renderAgendaPreview();
@@ -3504,7 +3600,8 @@ function renderAgendaPreview(){
     (_agendaPreview.repetidas ? ` · ${_agendaPreview.repetidas} linha(s) repetida(s) entre os prints ignorada(s)` : '') +
     (_agendaPreview.assumiu ? ` · dia não lido em ${_agendaPreview.assumiu} linha(s): usei ${fmtDataBR(L.find(l => l.data) ? L.find(l => l.data).data : '')}` : '') +
     (L.filter(linhaIncompleta).length ? ` · ${L.filter(linhaIncompleta).length} linha(s) incompleta(s) em vermelho` : '') +
-    '. Confira nomes, dia e horários.';
+    '. Confira nomes, dia e horários.' +
+    ((_agendaPreview.avisosLeitura || []).length ? ' ⚠ Conferir: ' + _agendaPreview.avisosLeitura.join('; ') + '.' : '');
 }
 function agendaPrevEditar(i, campo, valor){
   if(!_agendaPreview || !_agendaPreview.linhas[i]) return;
@@ -3630,9 +3727,12 @@ function baixarHistoricoZubaleCSV(){
 
 // ---- LANÇAMENTO (por print ou manual): adiciona à agenda da data/loja, sem apagar o que já existe ----
 function chaveTurno(t){ return normalizarTexto(t.nome) + '|' + t.inicio + '|' + t.fim; }
+function chaveLoja(l){ const n = normalizarTexto(l); const m = /LOJA (\d+)/.exec(n); return m ? 'LOJA ' + m[1] : n; }
 function adicionarTurnos(data, loja, turnos, origem, vagas){
   const lista = getAgendaZubale();
-  let ag = lista.find(x => x.data === data && normalizarTexto(x.loja) === normalizarTexto(loja));
+  const kLoja = chaveLoja(loja);
+  let ag = lista.find(x => x.data === data && (!kLoja || !chaveLoja(x.loja) || chaveLoja(x.loja) === kLoja));
+  if(ag && !ag.loja && loja) ag.loja = loja;
   if(!ag){
     ag = { id: 'ag' + Date.now(), data, loja, operadores: [], salvoEm: new Date().toISOString() };
     lista.push(ag);
