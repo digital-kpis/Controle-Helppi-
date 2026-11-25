@@ -481,6 +481,50 @@
     .pd-stats{ grid-template-columns:repeat(3, 1fr); }
     .pd-acoes button{ flex:1 1 45%; }
   }
+  /* ===== Chamada (marcação rápida) ===== */
+  .ch-sticky{ position:sticky; top:0; z-index:20; background:var(--panel); padding:8px 0; margin-bottom:6px; border-bottom:1px solid var(--border); }
+  .ch-sticky .ch-barra{ margin-bottom:8px; }
+  #chamadaBusca{ width:100%; margin:0 0 10px; }
+  .ch-barra{ display:flex; align-items:center; gap:10px; }
+  .ch-barra .num{ font-size:1.3rem; font-weight:800; white-space:nowrap; }
+  .ch-barra .pd-bar{ flex:1; margin:0; }
+  .ch-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+  .ch-chips button{ background:var(--panel2); color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:8px 14px; font-weight:700; font-size:.85rem; min-height:40px; }
+  .ch-chips button.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .ch-grupo{ display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; margin:16px 2px 8px; }
+  .ch-grupo strong{ font-size:1rem; }
+  .ch-grupo small{ color:var(--muted); margin-left:6px; font-weight:600; }
+  .ch-grupo button{ padding:8px 12px; font-size:.82rem; min-height:38px; }
+  .ch-row{ display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); border-left:5px solid var(--border); border-radius:12px; background:var(--panel2); margin-bottom:8px; }
+  .ch-row.atrasado{ border-left-color:#e0a030; background:rgba(224,160,48,.07); }
+  .ch-row.sugere{ border-left-color:var(--red); background:rgba(225,86,86,.06); }
+  .ch-row.presente{ border-left-color:var(--green); }
+  .ch-row.ausente{ border-left-color:var(--red); opacity:.85; }
+  .ch-info{ flex:1; min-width:0; }
+  .ch-nome{ font-weight:800; font-size:1.08rem; overflow-wrap:anywhere; line-height:1.2; }
+  .ch-sub{ font-size:.8rem; color:var(--muted); margin-top:2px; }
+  .ch-sub.warn{ color:#e0a030; font-weight:700; }
+  .ch-sub.bad{ color:var(--red); font-weight:700; }
+  .ch-sub.ok{ color:var(--green); font-weight:700; }
+  .ch-acoes{ display:flex; gap:8px; }
+  .ch-btn{ min-height:54px; min-width:104px; font-size:1.02rem; font-weight:800; border-radius:12px; border:1px solid var(--border); }
+  .ch-btn.ok{ background:var(--green); border-color:var(--green); color:#04230f; }
+  .ch-btn.no{ background:transparent; color:var(--red); border-color:var(--red); min-width:64px; }
+  .ch-btn.undo{ background:var(--panel); color:var(--text); }
+  .toast-btn{ margin-left:10px; padding:6px 12px; min-height:0; font-weight:800; }
+  @media (max-width:640px){
+    #zsecChamada .dia-nav{ flex-wrap:nowrap; gap:6px; }
+    #zsecChamada .dia-nav input{ flex:1 1 auto; min-width:0; }
+    #zsecChamada .dia-nav button{ padding:0 12px; min-height:44px; flex:0 0 auto; }
+    .ch-chips{ flex-wrap:nowrap; gap:4px; }
+    .ch-chips button{ padding:8px 4px; font-size:.76rem; min-height:40px; white-space:nowrap; }
+    .zsub{ gap:2px; padding:3px; overflow-x:auto; }
+    .zsub button{ padding:8px 2px; font-size:.72rem; min-width:0; line-height:1.2; }
+    .ch-row{ flex-wrap:wrap; }
+    .ch-acoes{ width:100%; }
+    .ch-acoes .ch-btn{ flex:1; min-height:58px; }
+    .ch-acoes .ch-btn.no{ flex:0 0 76px; }
+  }
 </style>
 </head>
 <body>
@@ -504,13 +548,29 @@
 <div class="panel" id="panelAgendaZubale" style="display:none;">
   <h2>📅 Agenda <span class="t-term">Zubale</span></h2>
   <div class="zsub">
-    <button id="zsubBtnAgendas" class="active" onclick="mudarSubZubale('agendas')">📋 Agendas</button>
+    <button id="zsubBtnChamada" class="active" onclick="mudarSubZubale('chamada')">✅ Chamada</button>
+    <button id="zsubBtnAgendas" onclick="mudarSubZubale('agendas')">📋 Agendas</button>
     <button id="zsubBtnLancar" onclick="mudarSubZubale('lancar')">➕ Lançar</button>
     <button id="zsubBtnHist" onclick="mudarSubZubale('hist')">📜 Histórico</button>
     <button id="zsubBtnRel" onclick="mudarSubZubale('rel')">📊 Relatório</button>
   </div>
 
-  <div id="zsecAgendas">
+  <div id="zsecChamada">
+    <div class="dia-nav">
+      <button class="secondary" onclick="chNav(-1)" title="Dia anterior">◀</button>
+      <input type="date" id="chamadaData" onchange="renderChamada()">
+      <button class="secondary" onclick="chNav(1)" title="Próximo dia">▶</button>
+      <button class="secondary" onclick="chHoje()">Hoje</button>
+    </div>
+    <input type="search" id="chamadaBusca" placeholder="🔍 Buscar nome..." oninput="renderChamada()" autocomplete="off">
+    <div class="ch-sticky">
+      <div id="chResumo"></div>
+      <div class="ch-chips" id="chChips"></div>
+    </div>
+    <div id="chamadaLista"></div>
+  </div>
+
+  <div id="zsecAgendas" style="display:none;">
   <div class="dia-nav">
     <button class="secondary" onclick="navDia(-1)" title="Dia anterior">◀</button>
     <input type="date" id="agendaFiltroData" onchange="renderAgendasSalvas()">
@@ -518,7 +578,9 @@
     <button class="secondary" onclick="irHoje()">Hoje</button>
     <button class="secondary" onclick="verTodasAgendas()">Todas</button>
   </div>
+  <input type="search" id="agendaBusca" placeholder="🔍 Buscar nome..." oninput="renderAgendasSalvas()" autocomplete="off" style="width:100%;margin:0 0 10px;">
   <div id="painelDia"></div>
+  <div id="agendaBuscaInfo" class="hint" style="display:none;margin:0 0 8px;"></div>
   <div id="agendaLista"></div>
   </div>
 
@@ -596,6 +658,7 @@
       </select>
       <button class="secondary" onclick="baixarRelatorioCSV()">⬇ CSV</button>
     </div>
+    <input type="search" id="relBusca" placeholder="🔍 Buscar nome..." oninput="renderRelatorio()" autocomplete="off" style="width:100%;margin:0 0 10px;">
     <div id="relResumo" class="pd-stats"></div>
     <div id="relTabela" style="margin-top:14px;"></div>
   </div>
@@ -3791,7 +3854,8 @@ function salvarAgendaPreview(){
     dias.forEach(d => { const r = adicionarTurnos(d, loja, porDia[d], 'print'); add += r.add; dup += r.dup; upd += r.upd; sinc += r.sinc; });
     cancelarAgendaPreview();
     document.getElementById('agendaFiltroData').value = dias.length === 1 ? dias[0] : '';
-    mudarSubZubale('agendas');
+    document.getElementById('chamadaData').value = dias.includes(todayStr()) ? todayStr() : dias[0];
+    mudarSubZubale('chamada');
     showToast(`${dias.length === 1 ? 'Agenda de ' + fmtDataBR(dias[0]) : dias.length + ' dias'}: ${add} turno(s) lançado(s)` + (upd ? `, ${upd} chegada(s) atualizada(s)` : '') + (sinc ? `, ${sinc} já marcado(s) Presente pelo Cadastro` : '') + (dup ? `, ${dup} já existia(m)` : '') + '.');
   }catch(err){
     console.error(err);
@@ -3954,12 +4018,172 @@ function sincronizarCadastroNaAgenda(ag){
   return total;
 }
 
+
+// ---- CHAMADA: uma tela só para marcar quem chegou (agenda + Cadastro juntos) ----
+let _chFiltro = 'pendentes', _chDesfazer = null;
+function chDia(){ return document.getElementById('chamadaData').value || todayStr(); }
+function chNav(n){ document.getElementById('chamadaData').value = somarDias(chDia(), n); renderChamada(); }
+function chHoje(){ document.getElementById('chamadaData').value = todayStr(); renderChamada(); }
+function chFiltro(f){ _chFiltro = f; renderChamada(); }
+function chItens(data){
+  const itens = [];
+  getAgendaZubale().filter(a => a.data === data).forEach(a => (a.operadores || []).forEach((o, i) => itens.push({ a, o, i, est: estadoTurno(a, o) })));
+  return itens;
+}
+// operador do Cadastro que corresponde a este nome da agenda (só quando não há dúvida)
+function operadorDoCadastro(nome, data){
+  const d = getPresencaLoja();
+  const v = vinculoDe(normalizarTexto(nome));
+  if(v) return d.operadores.find(o => o.id === v) || null;
+  let achados = d.operadores.filter(op => nomesCorrespondem(op.nome, nome) === 2);
+  if(achados.length !== 1) achados = d.operadores.filter(op => nomesCorrespondem(op.nome, nome) > 0);
+  if(achados.length !== 1) return null;
+  const op = achados[0];
+  // esse operador não pode servir para duas pessoas diferentes da agenda do dia
+  const nomesDia = new Set(); getAgendaZubale().filter(a => a.data === data).forEach(a => (a.operadores || []).forEach(o => { if(!vinculoDe(normalizarTexto(o.nome)) && nomesCorrespondem(op.nome, o.nome) > 0) nomesDia.add(normalizarTexto(o.nome)); }));
+  return nomesDia.size > 1 ? null : op;
+}
+// 'criou' | 'ja' (já estava marcado) | 'removeu' | false (sem Cadastro correspondente)
+function sincCadastroDeChamada(nome, data, marcar, hora){
+  if(EH_ZUBALE) return false;
+  const op = operadorDoCadastro(nome, data);
+  if(!op) return false;
+  const d = getPresencaLoja();
+  const idx = d.marcacoes.findIndex(m => m.operadorId === op.id && m.data === data);
+  if(marcar){
+    if(idx >= 0) return 'ja';
+    d.marcacoes.push({ id: 'pm' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), operadorId: op.id, data, hora });
+  }else{
+    if(idx < 0) return false;
+    d.marcacoes.splice(idx, 1);
+  }
+  savePresencaLoja(d);
+  renderListaPresencaRapido(); renderHistoricoPresenca();
+  if(data === todayStr()) renderListaAlmocoRapido();
+  return marcar ? 'criou' : 'removeu';
+}
+// Define a situação de um turno: '' (pendente), 'presente' ou 'ausente'
+function chDefinir(idA, i, sit, opts){
+  opts = opts || {};
+  const lista = getAgendaZubale();
+  const a = lista.find(x => x.id === idA);
+  if(!a || !a.operadores[i]) return false;
+  const o = a.operadores[i];
+  const antes = { situacao: o.situacao || '', entrada: o.entrada || '' };
+  const hora = opts.entrada || agoraHHMM();
+  let extra = '';
+  if(sit === 'presente'){
+    o.situacao = 'presente'; o.viaCadastro = false;
+    if(MOSTRAR_CHEGADA && !o.entrada){ o.entrada = hora; o.entradaViaChamada = true; extra = ` · chegada ${hora}`; }
+    const r = sincCadastroDeChamada(o.nome, a.data, true, o.entrada || hora);
+    if(r === 'criou') o.cadViaChamada = true;
+  }else{
+    if(o.viaCadastro || o.cadViaChamada) sincCadastroDeChamada(o.nome, a.data, false);
+    if(o.entradaViaChamada || o.entradaViaCadastro){ delete o.entrada; delete o.entradaViaChamada; delete o.entradaViaCadastro; }
+    o.situacao = sit; o.viaCadastro = false; delete o.cadViaChamada;
+  }
+  registrarHistorico('editado', a, o.nome, `situação: ${antes.situacao || '—'} → ${sit || '—'} (Chamada)${extra}`);
+  saveAgendaZubale(lista);
+  if(!opts.silencioso){
+    _chDesfazer = { idA, i, antes, nome: o.nome };
+    renderChamada(); renderAgendasSalvas(); renderHistoricoZubale();
+    toastDesfazer(sit === 'presente' ? `✓ ${o.nome} chegou${MOSTRAR_CHEGADA && o.entrada ? ' às ' + o.entrada : ''}` : sit === 'ausente' ? `✗ ${o.nome} faltou` : `↩ ${o.nome} voltou para pendente`);
+  }
+  return true;
+}
+function chChegou(idA, i){ chDefinir(idA, i, 'presente'); }
+function chFaltou(idA, i){ chDefinir(idA, i, 'ausente'); }
+function chDesfazerLinha(idA, i){ chDefinir(idA, i, ''); }
+function toastDesfazer(msg){
+  const el = document.getElementById('toast');
+  el.innerHTML = escapeHtml(msg) + ' <button class="toast-btn" onclick="desfazerUltimo()">Desfazer</button>';
+  el.style.pointerEvents = 'auto';
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 7000);
+}
+function desfazerUltimo(){
+  const u = _chDesfazer;
+  if(!u) return;
+  _chDesfazer = null;
+  chDefinir(u.idA, u.i, u.antes.situacao, { silencioso: true, entrada: u.antes.entrada || undefined });
+  renderChamada(); renderAgendasSalvas(); renderHistoricoZubale();
+  document.getElementById('toast').classList.remove('show');
+  showToast('Desfeito: ' + u.nome + '.');
+}
+function chGrupo(inicio, fim){
+  const alvo = chItens(chDia()).filter(x => x.o.inicio === inicio && x.o.fim === fim && x.est.estado !== 'presente' && x.est.estado !== 'ausente');
+  if(!alvo.length){ showToast('Todos deste horário já estão marcados.'); return; }
+  pedirConfirmacao(`Marcar ${alvo.length} pessoa(s) das ${inicio} como chegaram?`, () => {
+    alvo.forEach(x => chDefinir(x.a.id, x.i, 'presente', { silencioso: true }));
+    renderChamada(); renderAgendasSalvas(); renderHistoricoZubale();
+    showToast(`${alvo.length} marcado(s) como presentes.`);
+  });
+}
+function renderChamada(){
+  const box = document.getElementById('chamadaLista');
+  if(!box) return;
+  const data = chDia();
+  const todos = chItens(data);
+  if(!todos.length){
+    document.getElementById('chResumo').innerHTML = '';
+    document.getElementById('chChips').innerHTML = '';
+    const datas = Array.from(new Set(getAgendaZubale().map(a => a.data))).sort().reverse().slice(0, 5);
+    box.innerHTML = `<div class="empty">Nenhuma agenda em ${fmtDataBR(data)}.</div>
+      <div class="pd-datas">${datas.map(d => `<button class="secondary" onclick="document.getElementById('chamadaData').value='${d}';renderChamada()">${fmtDataBR(d).slice(0, 5)}</button>`).join('')}
+      <button onclick="mudarSubZubale('lancar')">➕ Lançar agenda</button></div>`;
+    return;
+  }
+  const pend = x => x.est.estado !== 'presente' && x.est.estado !== 'ausente';
+  const nPres = todos.filter(x => x.est.estado === 'presente').length;
+  const nAus = todos.filter(x => x.est.estado === 'ausente').length;
+  const nPend = todos.filter(pend).length;
+  const pct = Math.round(nPres / todos.length * 100);
+  document.getElementById('chResumo').innerHTML = `<div class="ch-barra"><span class="num">${nPres}/${todos.length}</span><div class="pd-bar"><span style="width:${pct}%"></span></div><span class="hint" style="margin:0;">${nAus ? nAus + ' faltou' : ''}</span></div>`;
+  const chip = (f, rot, n) => `<button class="${_chFiltro === f ? 'active' : ''}" onclick="chFiltro('${f}')">${rot} ${n}</button>`;
+  document.getElementById('chChips').innerHTML = chip('pendentes', 'Pendentes', nPend) + chip('presentes', 'Presentes', nPres) + chip('ausentes', 'Faltas', nAus) + chip('todos', 'Todos', todos.length);
+  const q = normalizarTexto(document.getElementById('chamadaBusca').value);
+  let itens = todos.filter(x => {
+    if(_chFiltro === 'pendentes' && !pend(x)) return false;
+    if(_chFiltro === 'presentes' && x.est.estado !== 'presente') return false;
+    if(_chFiltro === 'ausentes' && x.est.estado !== 'ausente') return false;
+    return !q || normalizarTexto(x.o.nome).includes(q);
+  });
+  if(!itens.length){
+    box.innerHTML = `<div class="empty">${q ? 'Ninguém com esse nome neste filtro.' : _chFiltro === 'pendentes' ? '🎉 Todos já foram marcados.' : 'Nada neste filtro.'}</div>`;
+    return;
+  }
+  const grupos = {};
+  itens.forEach(x => { const k = x.o.inicio + '|' + x.o.fim; (grupos[k] = grupos[k] || []).push(x); });
+  const peso = x => x.est.estado === 'sugerirAusente' ? 0 : x.est.estado === 'atrasado' ? 1 : 2;
+  box.innerHTML = Object.keys(grupos).sort().map(k => {
+    const [ini, fim] = k.split('|');
+    const g = grupos[k].sort((x, y) => peso(x) - peso(y) || (y.est.atraso || 0) - (x.est.atraso || 0) || x.o.nome.localeCompare(y.o.nome));
+    const doTurno = todos.filter(x => x.o.inicio === ini && x.o.fim === fim);
+    const presT = doTurno.filter(x => x.est.estado === 'presente').length;
+    return `<div class="ch-grupo"><div><strong>${escapeHtml(ini)}–${escapeHtml(fim)}</strong><small>${presT}/${doTurno.length} presentes</small></div>
+      ${doTurno.some(pend) ? `<button class="secondary" onclick="chGrupo('${ini}','${fim}')">✓ Todos chegaram</button>` : ''}</div>` +
+      g.map(x => {
+        const e = x.est.estado, id = escapeHtml(x.a.id);
+        const sub = e === 'presente' ? `<div class="ch-sub ok">✓ Presente${x.o.entrada ? ' · chegou ' + escapeHtml(x.o.entrada) : ''}</div>`
+          : e === 'ausente' ? '<div class="ch-sub bad">✗ Faltou</div>'
+          : e === 'atrasado' ? `<div class="ch-sub warn">⏰ ${fmtMin(x.est.atraso)} de atraso</div>`
+          : e === 'sugerirAusente' ? `<div class="ch-sub bad">⚠ sem chegada há ${fmtMin(x.est.atraso)}</div>` : '';
+        const botoes = e === 'presente' ? `<button class="ch-btn undo" onclick="chDesfazerLinha('${id}',${x.i})">↩ Desfazer</button>`
+          : e === 'ausente' ? `<button class="ch-btn ok" onclick="chChegou('${id}',${x.i})">✓ Chegou</button><button class="ch-btn undo" style="min-width:64px;" onclick="chDesfazerLinha('${id}',${x.i})">↩</button>`
+          : `<button class="ch-btn ok" onclick="chChegou('${id}',${x.i})">✓ Chegou</button><button class="ch-btn no" title="Faltou" onclick="chFaltou('${id}',${x.i})">✗</button>`;
+        return `<div class="ch-row ${e === 'aguardando' ? '' : e === 'sugerirAusente' ? 'sugere' : e}"><div class="ch-info"><div class="ch-nome">${escapeHtml(x.o.nome)}</div>${sub}</div><div class="ch-acoes">${botoes}</div></div>`;
+      }).join('');
+  }).join('');
+}
+
 function mudarSubZubale(nome){
-  const mapa = { agendas:['zsecAgendas','zsubBtnAgendas'], lancar:['zsecLancar','zsubBtnLancar'], hist:['zsecHist','zsubBtnHist'], rel:['zsecRel','zsubBtnRel'] };
+  const mapa = { chamada:['zsecChamada','zsubBtnChamada'], agendas:['zsecAgendas','zsubBtnAgendas'], lancar:['zsecLancar','zsubBtnLancar'], hist:['zsecHist','zsubBtnHist'], rel:['zsecRel','zsubBtnRel'] };
   Object.keys(mapa).forEach(k => {
     document.getElementById(mapa[k][0]).style.display = (k === nome) ? '' : 'none';
     document.getElementById(mapa[k][1]).classList.toggle('active', k === nome);
   });
+  if(nome === 'chamada') renderChamada();
   if(nome === 'agendas') renderAgendasSalvas();
   if(nome === 'hist') renderHistoricoZubale();
   if(nome === 'rel') renderRelatorio();
@@ -4356,7 +4580,9 @@ function renderRelatorio(){
   if(!_relMes) _relMes = todayStr().slice(0, 7);
   document.getElementById('relMes').value = _relMes;
   document.getElementById('relOrdemSel').value = _relOrdem;
-  const rows = dadosRelatorio(_relMes);
+  const todasLinhas = dadosRelatorio(_relMes);
+  const qRel = normalizarTexto(document.getElementById('relBusca').value);
+  const rows = qRel ? todasLinhas.filter(r => normalizarTexto(r.nome).includes(qRel)) : todasLinhas;
   const soma = k => rows.reduce((n, r) => n + r[k], 0);
   const pres = soma('presentes'), aus = soma('ausentes');
   const pctG = (pres + aus) ? Math.round(pres / (pres + aus) * 100) + '%' : '—';
@@ -4369,7 +4595,7 @@ function renderRelatorio(){
     <div class="pd-tile warn"><b>${soma('atrasos')}</b><small>Atrasos</small></div>
     <div class="pd-tile"><b>${fmtHoras(soma('horas'))}</b><small>Horas previstas</small></div>
     ${!EH_ZUBALE ? `<div class="pd-tile"><b>${soma('dobras')}</b><small>Dobras</small></div>` : ''}`;
-  if(!rows.length){ box.innerHTML = '<div class="empty">Nenhuma agenda neste mês.</div>'; return; }
+  if(!rows.length){ box.innerHTML = '<div class="empty">' + (qRel ? 'Ninguém com esse nome neste mês.' : 'Nenhuma agenda neste mês.') + '</div>'; return; }
   const cls = p => p === null ? '' : (p >= 0.9 ? 'bom' : p >= 0.7 ? 'med' : 'ruim');
   box.innerHTML = `<div style="overflow-x:auto;"><table class="tbl-cards">
     <thead><tr><th>${PESSOA}</th><th>Turnos</th><th>Presentes</th><th>Ausentes</th><th>Sem marcar</th><th>Atrasos</th><th>Atraso médio</th><th>Horas prev.</th><th>% Presença</th>${!EH_ZUBALE ? '<th>Dobras</th>' : ''}</tr></thead>
@@ -4409,14 +4635,25 @@ function renderAgendasSalvas(){
   }
   const filtro = document.getElementById('agendaFiltroData').value;
   renderPainelDia(filtro);
-  const lista = getAgendaZubale().filter(a => !filtro || a.data === filtro)
+  const q = normalizarTexto(document.getElementById('agendaBusca').value);
+  const info = document.getElementById('agendaBuscaInfo');
+  let lista = getAgendaZubale().filter(a => !filtro || a.data === filtro)
     .sort((a,b) => b.data.localeCompare(a.data) || String(a.loja).localeCompare(String(b.loja)));
+  if(q){
+    lista = lista.filter(a => (a.operadores || []).some(o => normalizarTexto(o.nome).includes(q)));
+    const n = lista.reduce((t, a) => t + (a.operadores || []).filter(o => normalizarTexto(o.nome).includes(q)).length, 0);
+    info.style.display = 'block';
+    info.textContent = `${n} resultado(s) para "${document.getElementById('agendaBusca').value.trim()}"` + (filtro ? ` em ${fmtDataBR(filtro)}` : ' em todas as agendas');
+  }else{
+    info.style.display = 'none';
+  }
   if(!lista.length){
-    box.innerHTML = filtro ? '' : '<div class="empty">Nenhuma agenda salva ainda.</div>';
+    box.innerHTML = q ? '<div class="empty">Ninguém com esse nome' + (filtro ? ' neste dia. Toque em "Todas" para procurar em todos os dias.' : '.') + '</div>'
+                      : (filtro ? '' : '<div class="empty">Nenhuma agenda salva ainda.</div>');
     return;
   }
   box.innerHTML = lista.map(a => {
-    const ops = (a.operadores || []).map((o, i) => ({ o, i }))
+    const ops = (a.operadores || []).map((o, i) => ({ o, i })).filter(x => !q || normalizarTexto(x.o.nome).includes(q))
       .sort((x,y) => (x.o.inicio || '').localeCompare(y.o.inicio || '') || x.o.nome.localeCompare(y.o.nome));
     const distintos = new Set(ops.map(x => normalizarTexto(x.o.nome))).size;
     const idA = escapeHtml(a.id);
@@ -4479,14 +4716,18 @@ document.addEventListener('paste', e => {
 
 function initAgendaZubale(){
   document.getElementById('agendaFiltroData').value = todayStr();     // abre sempre no dia de hoje
+  document.getElementById('chamadaData').value = todayStr();
   _relMes = todayStr().slice(0, 7);
   iniciarVinculosNuvem();
   // reavalia atrasos a cada minuto, sem atrapalhar quem está digitando
   setInterval(() => {
+    const ae = document.activeElement;
+    const editando = ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName);
+    const ch = document.getElementById('zsecChamada');
+    if(ch && ch.style.display !== 'none'){ if(!editando) renderChamada(); return; }
     const sec = document.getElementById('zsecAgendas');
     if(!sec || sec.style.display === 'none') return;
-    const ae = document.activeElement;
-    if(ae && ['INPUT', 'SELECT', 'TEXTAREA'].includes(ae.tagName) && sec.contains(ae)) return;
+    if(editando && sec.contains(ae)) return;
     renderAgendasSalvas();
   }, 60000);
   iniciarAgendaZubaleNuvem();
@@ -4501,6 +4742,7 @@ function initAgendaZubale(){
   ['manNome','manIni','manFim'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if(e.key === 'Enter') lancarManualZubale(); }));
   renderAgendasSalvas();
   renderHistoricoZubale();
+  mudarSubZubale('chamada');
 }
 
 function aplicarModulo(){
