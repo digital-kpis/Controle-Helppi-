@@ -1205,6 +1205,21 @@ const FB_CFG = {
 const FB_PATH = EH_ZUBALE ? 'controle_zubale' : 'controle_helppi';
 firebase.initializeApp(FB_CFG);
 const db = firebase.database();
+// Toda função que o Firebase chama de volta é protegida: se der erro, ele é registrado com o nome do ponto
+// (em vez de ser relançado pelo script do Firebase e aparecer como um "Script error." sem detalhes).
+(function(){
+  const refOrig = db.ref.bind(db);
+  db.ref = function(caminho){
+    const r = refOrig(caminho);
+    const onOrig = r.on.bind(r);
+    r.on = function(evento, cb){
+      const resto = Array.prototype.slice.call(arguments, 2);
+      const seguro = function(){ try{ return cb.apply(this, arguments); }catch(e){ console.error('Erro em retorno da nuvem', caminho, e); registrarErro('nuvem ' + caminho + ' (' + evento + ')', (e && e.message) || e); } };
+      return onOrig.apply(null, [evento, seguro].concat(resto));
+    };
+    return r;
+  };
+})();
 let _registrosCache = null;
 let _almocoCache = null;
 let _presencaLojaCache = null;
@@ -1224,11 +1239,19 @@ function registrarErro(origem, msg){
     localStorage.setItem(LOG_ERROS_KEY, JSON.stringify(l.slice(-30)));
   }catch(e){}
 }
+window.__ultimaAcao = null; window.__ctxErro = '';
+document.addEventListener('click', e => {
+  const b = e.target && e.target.closest && e.target.closest('button');
+  if(b) window.__ultimaAcao = { t: Date.now(), txt: ((b.getAttribute('onclick') || b.textContent || '').replace(/\s+/g, ' ').trim()).slice(0, 50) };
+}, true);
 window.addEventListener('error', e => {
-  const m = e.message || 'falha inesperada';
+  let m = e.message || 'falha inesperada';
   if(/ResizeObserver/i.test(m)) return;
-  registrarErro('página', m + (e.lineno ? ` (linha ${e.lineno})` : ''));
-  try{ showToast('⚠ Erro: ' + m + ' — veja Backup > Erros recentes.', 9000); }catch(x){}
+  const mudo = (m === 'Script error.' || m === 'Script error');          // erro de script de outro site: o navegador esconde os detalhes
+  const ac = window.__ultimaAcao && (Date.now() - window.__ultimaAcao.t) < 8000 ? ` · após tocar em: ${window.__ultimaAcao.txt}` : '';
+  const ctx = window.__ctxErro ? ` · durante: ${window.__ctxErro}` : '';
+  registrarErro(mudo ? 'página (script externo)' : 'página', m + (e.lineno ? ` (linha ${e.lineno})` : '') + ctx + ac);
+  if(!mudo){ try{ showToast('⚠ Erro: ' + m + ' — veja Backup > Erros recentes.', 9000); }catch(x){} }
 });
 window.addEventListener('unhandledrejection', e => {
   const r = e.reason;
@@ -3549,13 +3572,15 @@ function carregarTesseract(){
   return _tesseractPromise;
 }
 
-function prepararImagemParaOcr(file){
+function prepararImagemParaOcr(file, alvo){
+  alvo = alvo || 3000;
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      // amplia para ~3000 px de largura (texto pequeno de tela lê melhor), sem estourar a memória do aparelho
-      const esc = Math.max(1, Math.min(3, 3000 / img.width, Math.sqrt(12e6 / (img.width * img.height))));
+      // amplia p/ ~3000 px de largura (texto pequeno lê melhor) sem estourar a memória; na 2ª tentativa usa menos
+      const limitePx = alvo >= 3000 ? 12e6 : 5e6;
+      const esc = Math.max(1, Math.min(3, alvo / img.width, Math.sqrt(limitePx / (img.width * img.height))));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * esc); c.height = Math.round(img.height * esc);
       const ctx = c.getContext('2d');
@@ -3568,6 +3593,11 @@ function prepararImagemParaOcr(file){
     img.src = url;
   });
 }
+function textoErro(e){
+  if(e === null || e === undefined) return 'erro desconhecido';
+  if(typeof e === 'string') return e.slice(0, 140);
+  return String(e.message || e.error || e.code || JSON.stringify(e)).slice(0, 140);
+}
 function setAgendaStatus(msg){
   const el = document.getElementById('agendaStatus');
   el.style.display = msg ? 'block' : 'none';
@@ -3579,39 +3609,55 @@ async function lerPrintAgenda(){
   if(!arqs.length){ showToast('Escolha ou cole pelo menos um print da agenda.'); return; }
   const btn = document.getElementById('btnLerAgenda');
   btn.disabled = true;
+  window.__ctxErro = 'lendo prints';
   let worker = null, atual = 0;
   const total = arqs.length, resultados = [], falhas = [];
-  try{
-    setAgendaStatus('Carregando o leitor de imagem...');
-    await carregarTesseract();
-    worker = await Tesseract.createWorker('por', 1, {
-      logger: m => {
-        const pref = total > 1 ? `Print ${atual} de ${total}: ` : '';
-        if(m.status === 'recognizing text') setAgendaStatus(pref + 'lendo... ' + Math.round((m.progress || 0) * 100) + '%');
-        else if(m.status) setAgendaStatus(pref + 'preparando leitura (' + m.status + ')...');
-      }
-    });
+  const logger = m => {
+    const pref = total > 1 ? `Print ${atual} de ${total}: ` : '';
+    if(m.status === 'recognizing text') setAgendaStatus(pref + 'lendo... ' + Math.round((m.progress || 0) * 100) + '%');
+    else if(m.status) setAgendaStatus(pref + 'preparando leitura (' + m.status + ')...');
+  };
+  // errorHandler: sem ele o leitor lança o erro por conta própria e o navegador mostra só "Script error."
+  const novoWorker = async () => {
+    if(worker){ try{ await worker.terminate(); }catch(e){} worker = null; }
+    worker = await Tesseract.createWorker('por', 1, { logger, errorHandler: e => registrarErro('leitor de imagem', textoErro(e)) });
     await worker.setParameters({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+  };
+  try{
+    setAgendaStatus(navigator.onLine === false ? 'Sem internet: o leitor precisa baixar arquivos na primeira vez. Tentando...' : 'Carregando o leitor de imagem...');
+    await carregarTesseract();
+    await novoWorker();
     for(const arq of arqs){
       atual++;
-      try{
-        const canvas = await prepararImagemParaOcr(arq);
-        const r = await worker.recognize(canvas);
-        const objs = (r.data.lines || []).map(l => ({ text: l.text.replace(/\s+$/, ''), words: (l.words || []).map(w => ({ t: w.text, x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1 })) }));
-        resultados.push(interpretarAgendaTexto(objs.map(o => o.text), objs));
-      }catch(e){ console.error(e); falhas.push(arq.name || ('print ' + atual)); }
+      let feito = false, motivo = '';
+      for(const alvo of [3000, 1800]){                 // 2ª tentativa com a imagem menor (ajuda quando falta memória)
+        try{
+          const canvas = await prepararImagemParaOcr(arq, alvo);
+          const r = await worker.recognize(canvas);
+          const objs = (r.data.lines || []).map(l => ({ text: l.text.replace(/\s+$/, ''), words: (l.words || []).map(w => ({ t: w.text, x0: w.bbox.x0, x1: w.bbox.x1, y0: w.bbox.y0, y1: w.bbox.y1 })) }));
+          resultados.push(interpretarAgendaTexto(objs.map(o => o.text), objs));
+          feito = true; break;
+        }catch(e){
+          motivo = textoErro(e);
+          registrarErro('leitor de imagem', `${arq.name || 'print ' + atual} (${alvo}px): ${motivo}`);
+          try{ await novoWorker(); }catch(e2){ motivo = textoErro(e2); break; }
+        }
+      }
+      if(!feito) falhas.push(`${arq.name || 'print ' + atual} (${motivo})`);
     }
     mostrarAgendaPreview(resultados);
     let msg = '';
-    if(!_agendaPreview.linhas.length) msg = 'Não encontrei nenhum ' + pessoa + ' com horário nesse(s) print(s). Use um print da tabela de agenda ou adicione as linhas à mão abaixo.';
-    if(falhas.length) msg += (msg ? ' ' : '') + 'Não consegui ler: ' + falhas.join(', ') + '.';
+    if(!_agendaPreview.linhas.length && !falhas.length) msg = 'Não encontrei nenhum ' + pessoa + ' com horário nesse(s) print(s). Use um print da tabela de agenda ou adicione as linhas à mão abaixo.';
+    if(falhas.length) msg += (msg ? ' ' : '') + 'Não consegui ler: ' + falhas.join('; ') + '. Confira a internet e tente de novo, ou use "Lançar manualmente".';
     setAgendaStatus(msg);
   }catch(err){
     console.error(err);
+    registrarErro('leitor de imagem', textoErro(err));
     setAgendaStatus('');
-    showToast('⚠ ' + (err.message || 'Falha ao ler o print.'), 7000);
+    showToast('⚠ Não foi possível iniciar o leitor de imagem: ' + textoErro(err) + '. Confira a internet e tente de novo, ou use "Lançar manualmente".', 9000);
   }finally{
     if(worker){ try{ await worker.terminate(); }catch(e){} }
+    window.__ctxErro = '';
     btn.disabled = false;
   }
 }
